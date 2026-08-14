@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GymPro Admin Dashboard - Manage members, memberships, and notifications">
+  <title>GymPro - Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+  <button class="mobile-toggle" id="mobileToggle">☰</button>
+
+  <div class="dashboard">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="icon"><img src="/images/fitnesshub.jpg" alt="FIT24 Logo"></div>
+        <h2>FITNESS HUB</h2>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-page="overview" id="nav-overview">
+          <span class="nav-icon">📊</span> Overview
+        </button>
+        <button class="nav-item" data-page="members" id="nav-members">
+          <span class="nav-icon">👥</span> Members
+        </button>
+        <button class="nav-item" data-page="attendance" id="nav-attendance">
+          <span class="nav-icon">📋</span> Attendance
+        </button>
+        <button class="nav-item" data-page="notifications" id="nav-notifications">
+          <span class="nav-icon">🔔</span> Notifications
+        </button>
+        <button class="nav-item" data-page="logistics" id="nav-logistics">
+          <span class="nav-icon">📦</span> Logistics
+        </button>
+        <button class="nav-item" data-page="dues" id="nav-dues">
+          <span class="nav-icon">💰</span> Outstanding Dues
+        </button>
+        <button class="nav-item" data-page="settings" id="nav-settings">
+          <span class="nav-icon">⚙️</span> Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <div class="admin-avatar" id="adminAvatar">
+            <img src="/images/fitnesshub.jpg" alt="Fitnesshub">
+          </div>
+          <div>
+            <div class="name" id="adminName">Fitness Hub Admin</div>
+            <div class="role">Database Admin</div>
+          </div>
+        </div>
+
+        <button class="nav-item" id="logoutBtn" style="margin-top:8px; color: var(--red);">
+          <span class="nav-icon">🚪</span> Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+      <!-- OVERVIEW PAGE -->
+      <section class="page-section active" id="page-overview">
+        <div class="page-header">
+          <h1>Fitness Hub</h1>
+          <p>Here's your gym overview and management console.</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card purple fade-in">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total Members</div>
+          </div>
+          <div class="stat-card green fade-in" style="animation-delay:.1s">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" id="statActive">0</div>
+            <div class="stat-label">Active Members</div>
+          </div>
+          <div class="stat-card yellow fade-in" style="animation-delay:.2s">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-value" id="statExpiring">0</div>
+            <div class="stat-label">Expiring Soon</div>
+          </div>
+          <div class="stat-card red fade-in" style="animation-delay:.3s">
+            <div class="stat-icon">❌</div>
+            <div class="stat-value" id="statExpired">0</div>
+            <div class="stat-label">Expired</div>
+          </div>
+          <div class="stat-card teal fade-in" style="animation-delay:.4s">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="statTodayAttendance">0</div>
+            <div class="stat-label">Today's Attendance</div>
+          </div>
+        </div>
+
+        <div class="section-card slide-up">
+          <div class="section-header">
+            <h2>⏰ Expiring Soon</h2>
+          </div>
+          <div id="expiringList"></div>
+        </div>
+      </section>
+
+      <!-- MEMBERS PAGE -->
+      <section class="page-section" id="page-members">
+        <div class="page-header"
+          style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h1>Members</h1>
+            <p>Manage your gym members</p>
+          </div>
+          <button class="btn btn-primary" id="addMemberBtn" style="width:auto;">+ Add Member</button>
+        </div>
+
+        <div class="section-card">
+          <div class="section-header">
+            <h2>All Members</h2>
+            <div class="toolbar">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Search members...">
+              </div>
+              <select class="filter-select" id="statusFilter">
+                <option value="">All Members</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="paid">Paid</option>
+                <option value="due">Outstanding Due</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="membersTableContainer">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Phone</th>
+                  <th>Plan</th>
+                  <th>Join Date</th>
+                  <th>Expiry Date</th>
+                  <th>Membership</th>
+                  <th>Payment Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="membersBody"></tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" id="emptyState" style="display:none;">
+            <div class="empty-icon">🏋️</div>
+            <h3>No members found</h3>
+            <p>Add your first member to get started</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ATTENDANCE PAGE -->
+      <section class="page-section" id="page-attendance">
+        <div class="page-header">
+          <h1>Attendance</h1>
+          <p>Track daily gym attendance with morning &amp; day shifts</p>
+        </div>
+
+        <!-- Quick Check-in -->
+        <div class="section-card checkin-bar slide-up">
+          <div class="section-header">
+            <h2>⚡ Quick Check-in</h2>
+          </div>
+          <div class="checkin-form">
+            <div class="search-box" style="flex:1;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="checkinSearch" placeholder="Search member by name or phone..." autocomplete="off">
+              <div class="checkin-suggestions" id="checkinSuggestions"></div>
+            </div>
+            <input type="hidden" id="checkinMemberId">
+            <button class="btn btn-primary" id="checkinBtn" style="width:auto; white-space:nowrap;">✅ Check In</button>
+            <button class="btn btn-secondary" id="syncHikvisionBtn"
+              style="width:auto; white-space:nowrap; margin-left: auto;">🔄 Sync Device</button>
+          </div>
+        </div>
+
+        <!-- Today's Mini Stats -->
+        <div class="attendance-mini-stats slide-up" style="animation-delay:.1s">
+          <div class="mini-stat morning">
+            <span class="mini-stat-icon">🌅</span>
+            <div>
+              <div class="mini-stat-value" id="attendMorning">0</div>
+              <div class="mini-stat-label">Morning</div>
+            </div>
+          </div>
+          <div class="mini-stat day">
+            <span class="mini-stat-icon">☀️</span>
+            <div>
+              <div class="mini-stat-value" id="attendDay">0</div>
+              <div class="mini-stat-label">Day</div>
+            </div>
+          </div>
+          <div class="mini-stat total">
+            <span class="mini-stat-icon">📊</span>
+            <div>
+              <div class="mini-stat-value" id="attendTotal">0</div>
+              <div class="mini-stat-label">Total Today</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date Tabs & Shift Filter -->
+        <div class="section-card slide-up" style="animation-delay:.2s">
+          <div class="section-header" style="flex-wrap:wrap; gap:12px;">
+            <h2>📅 Attendance Records</h2>
+            <div class="shift-filter">
+              <button class="shift-btn active" data-shift="all">All</button>
+              <button class="shift-btn" data-shift="morning">🌅 Morning</button>
+              <button class="shift-btn" data-shift="day">☀️ Day</button>
+            </div>
+          </div>
+
+          <div class="date-tabs" id="dateTabs"></div>
+
+          <div id="attendanceTableContainer">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Member</th>
+                  <th>Phone</th>
+                  <th>Check-in Time</th>
+                  <th>Shift</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceBody"></tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" id="emptyAttendance" style="display:none;">
+            <div class="empty-icon">📋</div>
+            <h3>No attendance records</h3>
+            <p>No members have checked in for this date/shift.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTIFICATIONS PAGE -->
+      <section class="page-section" id="page-notifications">
+        <div class="page-header"
+          style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h1>Notifications</h1>
+            <p>SMS notification history</p>
+          </div>
+          <div class="toolbar" style="margin-top: 0;">
+            <select class="filter-select" id="notifFilter">
+              <option value="all">All Notifications</option>
+              <option value="sent">Sent Successfully</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadNotifications()" title="Refresh">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <div id="notificationsList" class="notifications-feed"></div>
+
+        <div class="empty-state section-card" id="emptyNotifications" style="display:none;">
+          <div class="empty-icon">📭</div>
+          <h3>No notifications found</h3>
+          <p>You have no notification history matching this filter.</p>
+        </div>
+      </section>
+
+      <!-- LOGISTICS PAGE -->
+      <section class="page-section" id="page-logistics">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h1>Logistics &amp; Inventory</h1>
+            <p>Track supplements, equipment, and other items</p>
+          </div>
+          <button class="btn btn-primary" id="addLogisticsBtn" style="width:auto;">+ Add Product</button>
+        </div>
+
+        <div class="logistics-container-layout">
+          <!-- Main grid for items -->
+          <div class="logistics-main">
+            <div class="section-card">
+              <div class="section-header">
+                <h2>All Products</h2>
+                <div class="toolbar">
+                  <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="logisticsSearchInput" placeholder="Search products...">
+                  </div>
+                </div>
+              </div>
+
+              <div class="logistics-grid" id="logisticsGrid"></div>
+
+              <div class="empty-state" id="emptyLogistics" style="display:none;">
+                <div class="empty-icon">📦</div>
+                <h3>No products found</h3>
+                <p>Add your first supplement or equipment to start tracking</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction sidebar -->
+          <aside class="logistics-sidebar section-card">
+            <div class="section-header">
+              <h2>📜 Recent Transactions</h2>
+            </div>
+            <div class="transaction-timeline" id="logisticsTransactionList">
+              <!-- Rendered dynamically -->
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- MEMBER PROFILE PAGE -->
+      <section class="page-section" id="page-member-profile">
+        <div class="page-header" style="margin-bottom:16px;">
+          <button class="btn btn-outline" id="btnBackToMembers" style="width:auto; padding:6px 12px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+            <span>&larr;</span> Back to Members
+          </button>
+        </div>
+
+        <!-- Profile Header Widget -->
+        <div class="profile-header-card section-card" style="margin-bottom:24px;">
+          <div class="profile-header-layout">
+            <div class="profile-avatar-wrapper" id="profileAvatarArea">
+              <!-- Avatar or initials loaded dynamically -->
+            </div>
+            <div class="profile-meta-info">
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <h1 id="profileFullName" style="margin:0; font-size:24px;">Rohan Aryal</h1>
+                <span class="badge" id="profileMembershipBadge">ACTIVE</span>
+                <span class="badge" id="profilePaymentBadge" style="background:#ef4444; color:white;">DUE: NPR 10,000</span>
+              </div>
+              <p style="margin:4px 0 0 0; color:var(--text-muted); font-size:14px;" id="profileSubText">
+                Code: <strong id="profileMemberCode">FH-000001</strong> | Phone: <span id="profilePhone">9812345678</span>
+              </p>
+            </div>
+            <div class="profile-actions-wrapper">
+              <button class="btn btn-primary" id="btnRenewMembership" style="width:auto; font-size:13px; padding:8px 14px;">🔄 Renew</button>
+              <button class="btn btn-outline" id="btnRecordPayment" style="width:auto; font-size:13px; padding:8px 14px;">💰 Pay Dues</button>
+              <button class="btn btn-outline" id="btnFreezeMembership" style="width:auto; font-size:13px; padding:8px 14px;">❄️ Freeze</button>
+              <button class="btn btn-outline" id="btnEditMemberProfile" style="width:auto; font-size:13px; padding:8px 14px;">✏️ Edit</button>
+            </div>
+          </div>
+
+          <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+
+          <!-- High-Level Financial Profile Metrics -->
+          <div class="profile-stats-grid">
+            <div class="profile-stat-card dues">
+              <span class="stat-label">Outstanding Balance</span>
+              <span class="stat-value" id="profileStatOutstanding">NPR 10,000</span>
+            </div>
+            <div class="profile-stat-card paid">
+              <span class="stat-label">Total Paid Amount</span>
+              <span class="stat-value" id="profileStatPaid">NPR 20,000</span>
+            </div>
+            <div class="profile-stat-card expiry">
+              <span class="stat-label">Membership Expiry</span>
+              <span class="stat-value" id="profileStatExpiry">2026-09-01</span>
+            </div>
+            <div class="profile-stat-card renewals">
+              <span class="stat-label">Total Renewals</span>
+              <span class="stat-value" id="profileStatRenewals">3 Times</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Tabs -->
+        <div class="profile-tabs-container">
+          <div class="profile-tabs">
+            <button class="profile-tab active" data-tab="overview">👤 Overview</button>
+            <button class="profile-tab" data-tab="memberships">🔄 Membership History</button>
+            <button class="profile-tab" data-tab="payments">💸 Payment History</button>
+            <button class="profile-tab" data-tab="attendance">📅 Attendance Log</button>
+          </div>
+
+          <!-- Tab Content Panes -->
+          <div class="profile-tab-content active" id="pane-overview">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; align-items: start;">
+              <!-- Personal Details Card -->
+              <div class="section-card" style="margin:0;">
+                <h3 style="margin-top:0; margin-bottom:16px;">📋 Personal Details</h3>
+                <div class="details-list">
+                  <div class="detail-row">
+                    <span class="detail-label">First Joining Date</span>
+                    <strong class="detail-value" id="detailJoinDate">2026-01-01</strong>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Date of Birth</span>
+                    <strong class="detail-value" id="detailDOB">1998-05-15</strong>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Gender</span>
+                    <strong class="detail-value" id="detailGender" style="text-transform:capitalize;">Male</strong>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Email Address</span>
+                    <strong class="detail-value" id="detailEmail">rohan@example.com</strong>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Home Address</span>
+                    <strong class="detail-value" id="detailAddress">Kathmandu, Nepal</strong>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Emergency Contact</span>
+                    <strong class="detail-value" id="detailEmergencyContact">Sita Aryal (Mother)</strong>
+                  </div>
+                  <div class="detail-row no-border">
+                    <span class="detail-label">Emergency Phone</span>
+                    <strong class="detail-value" id="detailEmergencyPhone">9841234567</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Profile Timeline / Audit Trail -->
+              <div class="section-card" style="margin:0;">
+                <h3 style="margin-top:0; margin-bottom:16px;">⏱️ Recent Financial Activities</h3>
+                <div class="timeline-logs" id="profileActivityTimeline">
+                  <!-- Dynamic timeline logs -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="pane-memberships">
+            <div class="section-card" style="margin:0; padding:16px;">
+              <h3 style="margin-top:0; margin-bottom:16px;">📜 Historical Packages & Renewals</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Package Plan</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Original Price</th>
+                    <th>Discount</th>
+                    <th>Payable Amount</th>
+                    <th>Total Paid</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="profileMembershipsBody">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="pane-payments">
+            <div class="section-card" style="margin:0; padding:16px;">
+              <h3 style="margin-top:0; margin-bottom:16px;">💸 Recorded Payment Transactions</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Receipt Number</th>
+                    <th>Amount Paid</th>
+                    <th>Payment Method</th>
+                    <th>Reference</th>
+                    <th>Recorded By</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="profilePaymentsBody">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="pane-attendance">
+            <div class="section-card" style="margin:0; padding:16px;">
+              <h3 style="margin-top:0; margin-bottom:16px;">📅 Gym Check-in Attendance logs</h3>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Check-in Time</th>
+                    <th>Shift</th>
+                    <th>Device IP</th>
+                  </tr>
+                </thead>
+                <tbody id="profileAttendanceBody">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OUTSTANDING DUES PAGE -->
+      <section class="page-section" id="page-dues">
+        <div class="page-header" style="margin-bottom:24px;">
+          <h1>💰 Outstanding Dues Management</h1>
+          <p>Collect unpaid balances and review outstanding gym memberships metrics</p>
+        </div>
+
+        <!-- Dues Analytics Row -->
+        <div class="stats-grid" style="margin-bottom:24px;">
+          <div class="stat-card red">
+            <div class="stat-icon">💸</div>
+            <div class="stat-label">Total Outstanding Dues</div>
+            <div class="stat-value" id="duesStatTotal" style="color:#ef4444;">NPR 0</div>
+          </div>
+          <div class="stat-card teal">
+            <div class="stat-icon">✅</div>
+            <div class="stat-label">Collected Today</div>
+            <div class="stat-value" id="duesStatCollected" style="color:var(--green);">NPR 0</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">📅</div>
+            <div class="stat-label">Collected This Month</div>
+            <div class="stat-value" id="duesStatCollectedMonth" style="color:#10b981;">NPR 0</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">🏦</div>
+            <div class="stat-label">Collected This Year</div>
+            <div class="stat-value" id="duesStatCollectedYear" style="color:var(--accent);">NPR 0</div>
+          </div>
+        </div>
+
+        <!-- Dues Table -->
+        <div class="section-card">
+          <div class="section-header">
+            <h2>Outstanding Memberships List</h2>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Phone</th>
+                <th>Plan Snapshot</th>
+                <th>Expiry Date</th>
+                <th>Due Date</th>
+                <th>Total Payable</th>
+                <th>Amount Paid</th>
+                <th>Dues Remaining</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="duesListBody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+          <div class="empty-state" id="emptyDuesList" style="display:none;">
+            <div class="empty-icon">🎉</div>
+            <h3>No outstanding dues!</h3>
+            <p>All members have paid their active gym fees.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS PAGE -->
+      <section class="page-section" id="page-settings">
+        <div class="page-header">
+          <h1>Settings</h1>
+          <p>Manage your account</p>
+        </div>
+        <div class="settings-card" style="margin-bottom: 24px;">
+          <h3>🎁 Manage Offer Packages</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Create custom membership packages (like "Dashain Offer") that will appear in the onboarding plan selection list.
+          </p>
+          <form id="createPackageForm" style="margin-bottom: 24px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Package Name *</label>
+                <input type="text" class="form-input" id="pkgName" required placeholder="e.g. Dashain Offer">
+              </div>
+              <div class="form-group">
+                <label>Duration (Months) *</label>
+                <input type="number" class="form-input" id="pkgDuration" required min="1" max="100" placeholder="e.g. 3">
+              </div>
+              <div class="form-group">
+                <label>Price (Rs.) *</label>
+                <input type="number" class="form-input" id="pkgPrice" required min="0" placeholder="e.g. 2000">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: auto;">➕ Add Package</button>
+          </form>
+          
+          <div class="packages-list-container">
+            <h4>Active Custom Packages</h4>
+            <div class="table-container" style="margin-top: 10px; box-shadow: none; border: 1px solid var(--glass-border);">
+              <table style="width:100%;">
+                <thead>
+                  <tr>
+                    <th>Package Name</th>
+                    <th>Duration</th>
+                    <th>Price</th>
+                    <th style="width: 80px; text-align: center;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="packagesListBody">
+                  <!-- Custom packages list will load here dynamically -->
+                </tbody>
+              </table>
+              <div id="emptyPackagesState" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
+                No custom packages created yet. Add one above!
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>🔑 Change Password</h3>
+          <form id="passwordForm">
+            <div class="form-group">
+              <label>Current Password</label>
+              <input type="password" class="form-input" id="currentPassword" required>
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" class="form-input" id="newPassword" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input type="password" class="form-input" id="confirmPassword" required minlength="6">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:auto;">Update Password</button>
+          </form>
+        </div>
+
+        <div class="settings-card" style="margin-top: 24px;">
+          <h3>🔒 Hikvision Hardware Settings</h3>
+          <form id="hikvisionForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Device IP Address</label>
+                <input type="text" class="form-input" id="hikIp" placeholder="192.168.1.182">
+              </div>
+              <div class="form-group">
+                <label>Device Port</label>
+                <input type="text" class="form-input" id="hikPort" placeholder="80">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Username</label>
+                <input type="text" class="form-input" id="hikUsername" placeholder="admin">
+              </div>
+              <div class="form-group">
+                <label>Password</label>
+                <input type="password" class="form-input" id="hikPassword" placeholder="********">
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+              <button type="button" class="btn btn-secondary" id="hikTestBtn" style="width: auto;">📡 Test
+                Connection</button>
+              <button type="submit" class="btn btn-primary" style="width: auto;">💾 Save Settings</button>
+            </div>
+
+
+          </form>
+        </div>
+
+        <div class="settings-card" style="margin-top: 24px;">
+          <h3>📱 Aakash SMS Configuration</h3>
+          <form id="smsSettingsForm">
+            <div class="form-group">
+              <label>Aakash SMS Auth Token</label>
+              <input type="password" class="form-input" id="smsAuthToken" placeholder="Enter your Aakash SMS Auth Token"
+                required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: auto;">💾 Save SMS Token</button>
+          </form>
+        </div>
+
+        <div class="settings-card" style="margin-top: 24px;">
+          <h3>📱 Aakash SMS Diagnostics & Troubleshooting</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Aakash SMS requires your gym computer's public IP address to be whitelisted in your Aakash SMS user panel.
+            If the IP address does not match, SMS notifications will fail to send.
+          </p>
+          <div
+            style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid var(--purple);">
+            <div style="margin-bottom: 6px; font-weight: 500; font-size: 14px;">💻 Gym Computer Public IP: <span
+                id="diagnoseIp"
+                style="font-family: monospace; color: var(--purple); font-weight: bold; font-size: 15px;">Loading...</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+              ℹ️ Copy this IP and paste it into your <strong>Aakash SMS User Panel -> Whitelist IPs</strong> list!
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" id="smsDiagnoseBtn" style="width: auto;">🔍 Run Diagnostic
+              Check</button>
+            <button type="button" class="btn btn-primary" id="smsTestBtn" style="width: auto;">📨 Send Test SMS</button>
+          </div>
+
+          <div id="diagnoseResult"
+            style="margin-top: 16px; display: none; padding: 12px; border-radius: 6px; font-size: 13px; font-family: monospace; line-height: 1.5; white-space: pre-wrap;">
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ADD/EDIT MEMBER MODAL -->
+  <div class="modal-overlay" id="memberModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add New Member</h2>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <form id="memberForm">
+        <div class="modal-body">
+          <input type="hidden" id="memberId">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Full Name *</label>
+              <input type="text" class="form-input" id="memberName" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+              <label>Phone Number *</label>
+              <input type="tel" class="form-input" id="memberPhone" required placeholder="+977-9800000000">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="form-input" id="memberEmail" placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+              <label>Address</label>
+              <input type="text" class="form-input" id="memberAddress" placeholder="Kathmandu, Nepal">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date of Birth</label>
+              <input type="date" class="form-input" id="memberDOB">
+            </div>
+            <div class="form-group">
+              <label>Gender</label>
+              <select class="form-input" id="memberGender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Emergency Contact Name</label>
+              <input type="text" class="form-input" id="memberEmergencyName" placeholder="e.g. Sita Aryal (Mother)">
+            </div>
+            <div class="form-group">
+              <label>Emergency Phone</label>
+              <input type="tel" class="form-input" id="memberEmergencyPhone" placeholder="e.g. 9841234567">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Join Date *</label>
+              <input type="date" class="form-input" id="memberJoinDate" required>
+            </div>
+            <div class="form-group">
+              <label>Duration (Optional)</label>
+              <select class="form-input" id="memberDuration">
+                <option value="custom">Custom Date (Manual)</option>
+                <option value="1">1 Month</option>
+                <option value="2">2 Months</option>
+                <option value="3">3 Months</option>
+                <option value="4">4 Months</option>
+                <option value="5">5 Months</option>
+                <option value="6">6 Months</option>
+                <option value="7">7 Months</option>
+                <option value="8">8 Months</option>
+                <option value="9">9 Months</option>
+                <option value="10">10 Months</option>
+                <option value="11">11 Months</option>
+                <option value="12">12 Months</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Expiry Date *</label>
+              <input type="date" class="form-input" id="memberExpiryDate" required placeholder="Select date">
+            </div>
+            <div class="form-group">
+              <label>Plan Type</label>
+              <select class="form-input" id="memberPlan">
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly (3 months)</option>
+                <option value="Half-Yearly">Half-Yearly (6 months)</option>
+                <option value="Yearly">Yearly (12 months)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div id="onboardingPaymentSection">
+            <h4 style="margin-top:20px; margin-bottom:10px; font-size:14px; border-bottom:1px solid var(--border); padding-bottom:6px;">💰 Initial Payment / Fees</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Amount Paid Now (NPR)</label>
+                <input type="number" class="form-input" id="memberAmountPaid" min="0" placeholder="e.g. 10000" value="0">
+              </div>
+              <div class="form-group">
+                <label>Payment Method</label>
+                <select class="form-input" id="memberPaymentMethod">
+                  <option value="Cash">Cash</option>
+                  <option value="QR">QR Scan</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Card">Card Payment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Transaction Reference (Optional)</label>
+                <input type="text" class="form-input" id="memberTransactionRef" placeholder="e.g. Txn-908123">
+              </div>
+              <div class="form-group">
+                <label>Payment Due Date (If unpaid/partially paid)</label>
+                <input type="date" class="form-input" id="memberPaymentDueDate">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea class="form-input" id="memberNotes" placeholder="Any additional notes..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Member Photo</label>
+            <div class="photo-section-layout">
+              <div class="member-photo-preview-container">
+                <img id="memberPhotoPreview" src="" alt="Preview" style="display: none;">
+                <div id="memberPhotoInitials" class="member-photo-initials-placeholder">?</div>
+                <button type="button" class="photo-clear-btn" id="memberPhotoClearBtn" style="display: none;" title="Remove photo">✕</button>
+              </div>
+              <div class="photo-controls">
+                <div class="photo-tabs">
+                  <button type="button" class="photo-tab-btn active" id="photoTabUploadBtn">📁 Upload File</button>
+                  <button type="button" class="photo-tab-btn" id="photoTabWebcamBtn">📷 Use Webcam</button>
+                </div>
+                <div class="photo-pane active" id="photoPaneUpload">
+                  <input type="file" id="memberImageInput" accept="image/*" class="form-input" style="padding: 8px;">
+                </div>
+                <div class="photo-pane" id="photoPaneWebcam">
+                  <div class="webcam-container">
+                    <div class="webcam-viewfinder-brackets" id="webcamViewfinder" style="display: none;"></div>
+                    <video id="webcamStream" autoplay playsinline muted></video>
+                    <div class="webcam-actions">
+                      <button type="button" class="btn btn-secondary btn-sm" id="webcamStartBtn">🔌 Start Camera</button>
+                      <button type="button" class="btn btn-primary btn-sm" id="webcamCaptureBtn" style="display: none;">📸 Capture</button>
+                    </div>
+                  </div>
+                  <canvas id="webcamCanvas" width="320" height="240" style="display: none;"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="modalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="modalSubmit" style="width:auto;">Add Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD/EDIT LOGISTICS MODAL -->
+  <div class="modal-overlay" id="logisticsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="logisticsModalTitle">Add New Product</h2>
+        <button class="modal-close" id="logisticsModalClose">✕</button>
+      </div>
+      <form id="logisticsForm">
+        <div class="modal-body">
+          <input type="hidden" id="logisticsId">
+          <div class="form-group">
+            <label>Product Name *</label>
+            <input type="text" class="form-input" id="logisticsName" required placeholder="Creatine Monohydrate, Whey, Shaker...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Price (Rs.) *</label>
+              <input type="number" class="form-input" id="logisticsPrice" required min="0" step="0.01" placeholder="3500">
+            </div>
+            <div class="form-group" id="logisticsQuantityGroup">
+              <label>Initial Quantity *</label>
+              <input type="number" class="form-input" id="logisticsQuantity" min="0" placeholder="10">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Product Image</label>
+            <div class="dropzone" id="logisticsDropzone">
+              <span class="dropzone-text">📸 Click or drag image here to upload</span>
+              <input type="file" id="logisticsImageInput" accept="image/*" style="display:none;">
+              <img id="logisticsImagePreview" class="dropzone-preview" alt="Preview">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="logisticsModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="logisticsModalSubmit" style="width:auto;">Add Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SELL LOGISTICS MODAL -->
+  <div class="modal-overlay" id="logisticsSellModal">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2>Sell Product</h2>
+        <button class="modal-close" id="logisticsSellModalClose">✕</button>
+      </div>
+      <form id="logisticsSellForm">
+        <div class="modal-body">
+          <input type="hidden" id="logisticsSellId">
+          <div style="margin-bottom: 20px; text-align: center;">
+            <h3 id="logisticsSellProductName" style="font-size: 18px; margin-bottom: 4px;">Creatine</h3>
+            <p id="logisticsSellProductStock" style="color: var(--text-muted); font-size: 14px;">Available stock: 15</p>
+          </div>
+          <div class="form-group">
+            <label>Quantity to Sell *</label>
+            <input type="number" class="form-input" id="logisticsSellQuantity" required min="1" placeholder="1">
+          </div>
+          <div class="form-group">
+            <label>Notes (Optional)</label>
+            <input type="text" class="form-input" id="logisticsSellNotes" placeholder="e.g. Sold to Member John">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="logisticsSellModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Confirm Sale</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RESTOCK LOGISTICS MODAL -->
+  <div class="modal-overlay" id="logisticsRestockModal">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2>Restock Product</h2>
+        <button class="modal-close" id="logisticsRestockModalClose">✕</button>
+      </div>
+      <form id="logisticsRestockForm">
+        <div class="modal-body">
+          <input type="hidden" id="logisticsRestockId">
+          <div style="margin-bottom: 20px; text-align: center;">
+            <h3 id="logisticsRestockProductName" style="font-size: 18px; margin-bottom: 4px;">Creatine</h3>
+            <p id="logisticsRestockProductStock" style="color: var(--text-muted); font-size: 14px;">Current stock: 15</p>
+          </div>
+          <div class="form-group">
+            <label>Quantity to Add *</label>
+            <input type="number" class="form-input" id="logisticsRestockQuantity" required min="1" placeholder="10">
+          </div>
+          <div class="form-group">
+            <label>Notes (Optional)</label>
+            <input type="text" class="form-input" id="logisticsRestockNotes" placeholder="e.g. New shipment arrival">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="logisticsRestockModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Add Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RENEW MEMBERSHIP MODAL -->
+  <div class="modal-overlay" id="renewMembershipModal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2>🔄 Renew Gym Membership</h2>
+        <button class="modal-close" id="renewModalClose">✕</button>
+      </div>
+      <form id="renewMembershipForm">
+        <div class="modal-body">
+          <input type="hidden" id="renewMemberId">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Select Plan / Package *</label>
+              <select class="form-input" id="renewPlanSelect" required>
+                <!-- Loaded dynamically -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Membership Price (NPR)</label>
+              <input type="number" class="form-input" id="renewOriginalPrice" readonly>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Discount Type</label>
+              <select class="form-input" id="renewDiscountType">
+                <option value="NONE">No Discount</option>
+                <option value="FIXED">Fixed Amount (NPR)</option>
+                <option value="PERCENT">Percentage (%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Discount Value</label>
+              <input type="number" class="form-input" id="renewDiscountAmount" value="0" min="0">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Date *</label>
+              <input type="date" class="form-input" id="renewStartDate" required>
+            </div>
+            <div class="form-group">
+              <label>End Date *</label>
+              <input type="date" class="form-input" id="renewEndDate" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Final Payable Amount (NPR)</label>
+              <input type="number" class="form-input" id="renewFinalPayable" readonly style="font-weight:bold; color:var(--green); font-size:16px;">
+            </div>
+            <div class="form-group">
+              <label>Payment Due Date (Optional)</label>
+              <input type="date" class="form-input" id="renewPaymentDueDate">
+            </div>
+          </div>
+
+          <h4 style="margin-top:16px; margin-bottom:8px; font-size:14px; border-bottom:1px solid var(--border); padding-bottom:4px;">💰 Immediate Payment details</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Amount Paid Now (NPR)</label>
+              <input type="number" class="form-input" id="renewAmountPaid" value="0" min="0">
+            </div>
+            <div class="form-group">
+              <label>Payment Method</label>
+              <select class="form-input" id="renewPaymentMethod">
+                <option value="Cash">Cash</option>
+                <option value="QR">QR Scan</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Card">Card Payment</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Reference (e.g. TXN-1092)</label>
+              <input type="text" class="form-input" id="renewPaymentRef">
+            </div>
+            <div class="form-group">
+              <label>Renewal Notes</label>
+              <input type="text" class="form-input" id="renewNotes" placeholder="e.g. Early renewal discount applied">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="renewModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Confirm Renewal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RECORD PAYMENT MODAL -->
+  <div class="modal-overlay" id="recordPaymentModal">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2>💰 Record Outstanding Dues Payment</h2>
+        <button class="modal-close" id="recordPaymentModalClose">✕</button>
+      </div>
+      <form id="recordPaymentForm">
+        <div class="modal-body">
+          <input type="hidden" id="recordPayMemberId">
+          <input type="hidden" id="recordPayMembershipId">
+          <div style="background:#f9fafb; padding:12px; border-radius:6px; border:1px solid #f3f4f6; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
+              <span style="color:var(--text-muted);">Membership Plan:</span>
+              <strong id="recordPayPlanName">Custom Plan</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:14px;">
+              <span style="color:var(--text-muted);">Outstanding Balance:</span>
+              <strong id="recordPayOutstandingBalance" style="color:#ef4444;">NPR 0</strong>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Amount to Pay *</label>
+            <input type="number" class="form-input" id="recordPayAmount" required min="1" step="0.1" placeholder="e.g. 5000">
+          </div>
+          <div class="form-group">
+            <label>Payment Method *</label>
+            <select class="form-input" id="recordPayMethod" required>
+              <option value="Cash">Cash</option>
+              <option value="QR">QR Scan</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Card">Card Payment</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Transaction Reference (Optional)</label>
+            <input type="text" class="form-input" id="recordPayRef" placeholder="e.g. Txn-901283">
+          </div>
+          <div class="form-group">
+            <label>Payment Notes</label>
+            <input type="text" class="form-input" id="recordPayNotes" placeholder="e.g. Cleared pending dues">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="recordPayModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FREEZE MEMBERSHIP MODAL -->
+  <div class="modal-overlay" id="freezeMembershipModal">
+    <div class="modal" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2>❄️ Freeze Membership</h2>
+        <button class="modal-close" id="freezeModalClose">✕</button>
+      </div>
+      <form id="freezeMembershipForm">
+        <div class="modal-body">
+          <input type="hidden" id="freezeMembershipId">
+          <div class="form-group">
+            <label>Freeze Duration (Days) *</label>
+            <input type="number" class="form-input" id="freezeDays" required min="1" max="180" placeholder="e.g. 15">
+          </div>
+          <div class="form-group">
+            <label>Reason for Freezing *</label>
+            <input type="text" class="form-input" id="freezeReason" required placeholder="e.g. Medical injury / Travel">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="freezeModalCancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="width:auto;">Freeze Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONFIRM DIALOG -->
+  <div class="modal-overlay confirm-dialog" id="confirmDialog">
+    <div class="modal">
+      <div class="modal-body">
+        <div class="confirm-icon">⚠️</div>
+        <h3 id="confirmTitle">Are you sure?</h3>
+        <p id="confirmMessage">This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
+        <button class="btn btn-danger" id="confirmOk">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- FLOATING CHATBOT -->
+  <div class="chatbot-container">
+    <button class="chatbot-trigger" id="chatbotTrigger" title="Chat with AI Assistant">
+      <img src="/images/chatbotty.jpg" alt="AI Robot" class="chatbot-trigger-img">
+    </button>
+
+    <div class="chatbot-window" id="chatbotWindow">
+      <div class="chatbot-header">
+        <div class="chatbot-info">
+          <span class="chatbot-status-dot"></span>
+          <div>
+            <h4>Fitness Hub AI</h4>
+            <span class="chatbot-status-text">Online</span>
+          </div>
+        </div>
+        <button class="chatbot-close" id="chatbotClose">✕</button>
+      </div>
+      <div class="chatbot-messages" id="chatbotMessages">
+        <div class="chat-message bot">
+          <div class="message-content">
+            Hello! I am your Fitness Hub AI Assistant. How can I help you manage your gym today?
+          </div>
+        </div>
+      </div>
+      <div class="chatbot-input-area">
+        <input type="text" id="chatbotInput" placeholder="Ask about members, attendance, plans..." autocomplete="off">
+        <button id="chatbotSend" title="Send Message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+
+</html>

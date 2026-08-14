@@ -1,0 +1,37 @@
+{
+  "name": "gym-management-system",
+  "version": "1.0.0",
+  "description": "Gym Management System with Admin Dashboard & SMS Notifications",
+  "main": "electron.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --experimental-sqlite server.js",
+    "reset": "node --experimental-sqlite reset-db.js",
+    "app": "electron . > debug.log 2>&1",
+    "build": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.gympro.app",
+    "productName": "GymPro",
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable"
+    }
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "express-session": "^1.18.1",
+    "node-cron": "^3.0.3",
+    "twilio": "^5.4.0"
+  },
+  "devDependencies": {
+    "electron": "^41.6.1",
+    "electron-builder": "^26.8.1"
+  }
+}
