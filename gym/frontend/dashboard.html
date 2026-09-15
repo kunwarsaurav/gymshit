@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="GymPro Admin Dashboard - Manage members, memberships, and notifications">
   <title>GymPro - Dashboard</title>
-  <link rel="stylesheet" href="/css/style.css?v=2">
+  <link rel="stylesheet" href="/css/style.css?v=6">
 </head>
 
 <body>
@@ -325,14 +325,14 @@
 
       <!-- MEMBER PROFILE PAGE -->
       <section class="page-section" id="page-member-profile">
-        <div class="page-header" style="margin-bottom:16px;">
-          <button class="btn btn-outline" id="btnBackToMembers" style="width:auto; padding:6px 12px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-            <span>&larr;</span> Back to Members
+        <div class="page-header" style="margin-bottom:20px;">
+          <button class="btn-back-pill" id="btnBackToMembers">
+            <span style="font-size:15px;">&larr;</span> Back to Members
           </button>
         </div>
 
         <!-- Profile Header Widget -->
-        <div class="profile-header-card section-card" style="margin-bottom:24px;">
+        <div class="profile-header-card" style="margin-bottom:24px;">
           <div class="profile-header-layout">
             <div class="profile-avatar-wrapper" id="profileAvatarArea">
               <!-- Avatar or initials loaded dynamically -->
@@ -341,39 +341,40 @@
               <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                 <h1 id="profileFullName" style="margin:0; font-size:24px;">Rohan Aryal</h1>
                 <span class="badge" id="profileMembershipBadge">ACTIVE</span>
-                <span class="badge" id="profilePaymentBadge" style="background:#ef4444; color:white;">DUE: NPR 10,000</span>
+                <span class="badge" id="profilePaymentBadge">PAID</span>
               </div>
-              <p style="margin:4px 0 0 0; color:var(--text-muted); font-size:14px;" id="profileSubText">
-                Code: <strong id="profileMemberCode">FH-000001</strong> | Phone: <span id="profilePhone">9812345678</span>
-              </p>
+              <div class="profile-meta-chips" id="profileSubText">
+                <span class="profile-chip">🪪 ID: <strong id="profileMemberCode">FH-000001</strong></span>
+                <span class="profile-chip">📞 Phone: <span id="profilePhone" style="font-weight:700; color:var(--text-primary);">9812345678</span></span>
+              </div>
             </div>
             <div class="profile-actions-wrapper">
-              <button class="btn btn-primary" id="btnRenewMembership" style="width:auto; font-size:13px; padding:8px 14px;">🔄 Renew</button>
-              <button class="btn btn-outline" id="btnRecordPayment" style="width:auto; font-size:13px; padding:8px 14px;">💰 Pay Dues</button>
-              <button class="btn btn-outline" id="btnFreezeMembership" style="width:auto; font-size:13px; padding:8px 14px;">❄️ Freeze</button>
-              <button class="btn btn-outline" id="btnEditMemberProfile" style="width:auto; font-size:13px; padding:8px 14px;">✏️ Edit</button>
+              <button class="btn btn-primary" id="btnRenewMembership">🔄 Renew</button>
+              <button class="btn btn-outline" id="btnRecordPayment">💰 Pay Dues</button>
+              <button class="btn btn-outline" id="btnFreezeMembership">❄️ Freeze</button>
+              <button class="btn btn-outline" id="btnEditMemberProfile">✏️ Edit</button>
             </div>
           </div>
 
-          <hr style="border:none; border-top:1px solid var(--border); margin:20px 0;">
+          <div class="profile-divider"></div>
 
           <!-- High-Level Financial Profile Metrics -->
           <div class="profile-stats-grid">
             <div class="profile-stat-card dues">
-              <span class="stat-label">Outstanding Balance</span>
-              <span class="stat-value" id="profileStatOutstanding">NPR 10,000</span>
+              <span class="stat-label">💳 Outstanding Balance</span>
+              <span class="stat-value" id="profileStatOutstanding">NPR 0</span>
             </div>
             <div class="profile-stat-card paid">
-              <span class="stat-label">Total Paid Amount</span>
-              <span class="stat-value" id="profileStatPaid">NPR 20,000</span>
+              <span class="stat-label">💰 Total Paid Amount</span>
+              <span class="stat-value" id="profileStatPaid">NPR 0</span>
             </div>
             <div class="profile-stat-card expiry">
-              <span class="stat-label">Membership Expiry</span>
-              <span class="stat-value" id="profileStatExpiry">2026-09-01</span>
+              <span class="stat-label">📅 Membership Expiry</span>
+              <span class="stat-value" id="profileStatExpiry">N/A</span>
             </div>
             <div class="profile-stat-card renewals">
-              <span class="stat-label">Total Renewals</span>
-              <span class="stat-value" id="profileStatRenewals">3 Times</span>
+              <span class="stat-label">🔄 Total Renewals</span>
+              <span class="stat-value" id="profileStatRenewals">0 Renewals</span>
             </div>
           </div>
         </div>
@@ -382,52 +383,52 @@
         <div class="profile-tabs-container">
           <div class="profile-tabs">
             <button class="profile-tab active" data-tab="overview">👤 Overview</button>
-            <button class="profile-tab" data-tab="memberships">🔄 Membership History</button>
+            <button class="profile-tab" data-tab="memberships">📜 Membership History</button>
             <button class="profile-tab" data-tab="payments">💸 Payment History</button>
             <button class="profile-tab" data-tab="attendance">📅 Attendance Log</button>
           </div>
 
           <!-- Tab Content Panes -->
           <div class="profile-tab-content active" id="pane-overview">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; align-items: start;">
+            <div class="profile-overview-grid">
               <!-- Personal Details Card -->
-              <div class="section-card" style="margin:0;">
-                <h3 style="margin-top:0; margin-bottom:16px;">📋 Personal Details</h3>
+              <div class="section-card" style="margin:0; padding:24px;">
+                <h3 style="margin-top:0; margin-bottom:18px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">📋 Personal Details</h3>
                 <div class="details-list">
                   <div class="detail-row">
-                    <span class="detail-label">First Joining Date</span>
+                    <span class="detail-label"><span>📅</span> First Joining Date</span>
                     <strong class="detail-value" id="detailJoinDate">2026-01-01</strong>
                   </div>
                   <div class="detail-row">
-                    <span class="detail-label">Date of Birth</span>
+                    <span class="detail-label"><span>🎂</span> Date of Birth</span>
                     <strong class="detail-value" id="detailDOB">1998-05-15</strong>
                   </div>
                   <div class="detail-row">
-                    <span class="detail-label">Gender</span>
+                    <span class="detail-label"><span>👤</span> Gender</span>
                     <strong class="detail-value" id="detailGender" style="text-transform:capitalize;">Male</strong>
                   </div>
                   <div class="detail-row">
-                    <span class="detail-label">Email Address</span>
+                    <span class="detail-label"><span>✉️</span> Email Address</span>
                     <strong class="detail-value" id="detailEmail">rohan@example.com</strong>
                   </div>
                   <div class="detail-row">
-                    <span class="detail-label">Home Address</span>
+                    <span class="detail-label"><span>🏠</span> Home Address</span>
                     <strong class="detail-value" id="detailAddress">Kathmandu, Nepal</strong>
                   </div>
                   <div class="detail-row">
-                    <span class="detail-label">Emergency Contact</span>
+                    <span class="detail-label"><span>👥</span> Emergency Contact</span>
                     <strong class="detail-value" id="detailEmergencyContact">Sita Aryal (Mother)</strong>
                   </div>
                   <div class="detail-row no-border">
-                    <span class="detail-label">Emergency Phone</span>
+                    <span class="detail-label"><span>🚨</span> Emergency Phone</span>
                     <strong class="detail-value" id="detailEmergencyPhone">9841234567</strong>
                   </div>
                 </div>
               </div>
 
               <!-- Profile Timeline / Audit Trail -->
-              <div class="section-card" style="margin:0;">
-                <h3 style="margin-top:0; margin-bottom:16px;">⏱️ Recent Financial Activities</h3>
+              <div class="section-card" style="margin:0; padding:24px;">
+                <h3 style="margin-top:0; margin-bottom:18px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">⏱️ Recent Financial Activities</h3>
                 <div class="timeline-logs" id="profileActivityTimeline">
                   <!-- Dynamic timeline logs -->
                 </div>
@@ -436,8 +437,8 @@
           </div>
 
           <div class="profile-tab-content" id="pane-memberships">
-            <div class="section-card" style="margin:0; padding:16px;">
-              <h3 style="margin-top:0; margin-bottom:16px;">📜 Historical Packages & Renewals</h3>
+            <div class="section-card" style="margin:0; padding:20px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">📜 Historical Packages & Renewals</h3>
               <table class="data-table">
                 <thead>
                   <tr>
@@ -459,8 +460,8 @@
           </div>
 
           <div class="profile-tab-content" id="pane-payments">
-            <div class="section-card" style="margin:0; padding:16px;">
-              <h3 style="margin-top:0; margin-bottom:16px;">💸 Recorded Payment Transactions</h3>
+            <div class="section-card" style="margin:0; padding:20px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">💸 Recorded Payment Transactions</h3>
               <table class="data-table">
                 <thead>
                   <tr>
@@ -482,8 +483,8 @@
           </div>
 
           <div class="profile-tab-content" id="pane-attendance">
-            <div class="section-card" style="margin:0; padding:16px;">
-              <h3 style="margin-top:0; margin-bottom:16px;">📅 Gym Check-in Attendance logs</h3>
+            <div class="section-card" style="margin:0; padding:20px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px;">📅 Gym Check-in Attendance logs</h3>
               <table class="data-table">
                 <thead>
                   <tr>
@@ -1079,27 +1080,28 @@
 
   <!-- RECORD PAYMENT MODAL -->
   <div class="modal-overlay" id="recordPaymentModal">
-    <div class="modal" style="max-width: 450px;">
+    <div class="modal" style="max-width: 460px;">
       <div class="modal-header">
-        <h2>💰 Record Outstanding Dues Payment</h2>
-        <button class="modal-close" id="recordPaymentModalClose">✕</button>
+        <h2>Record Dues Payment</h2>
+        <button class="modal-close" id="recordPaymentModalClose" title="Close">✕</button>
       </div>
       <form id="recordPaymentForm">
         <div class="modal-body">
           <input type="hidden" id="recordPayMemberId">
           <input type="hidden" id="recordPayMembershipId">
-          <div style="background:#f9fafb; padding:12px; border-radius:6px; border:1px solid #f3f4f6; margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:14px;">
-              <span style="color:var(--text-muted);">Membership Plan:</span>
-              <strong id="recordPayPlanName">Custom Plan</strong>
+          <div class="modal-summary-card">
+            <div class="modal-summary-row">
+              <span class="modal-summary-label"><span>📋</span> Membership Plan:</span>
+              <strong class="modal-summary-value" id="recordPayPlanName">Custom Plan</strong>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:14px;">
-              <span style="color:var(--text-muted);">Outstanding Balance:</span>
-              <strong id="recordPayOutstandingBalance" style="color:#ef4444;">NPR 0</strong>
+            <div class="modal-summary-divider"></div>
+            <div class="modal-summary-row">
+              <span class="modal-summary-label"><span>💳</span> Outstanding Balance:</span>
+              <span class="badge-due" id="recordPayOutstandingBalance">NPR 0</span>
             </div>
           </div>
           <div class="form-group">
-            <label>Amount to Pay *</label>
+            <label>Amount to Pay (NPR) *</label>
             <input type="number" class="form-input" id="recordPayAmount" required min="1" step="0.1" placeholder="e.g. 5000">
           </div>
           <div class="form-group">
@@ -1116,7 +1118,7 @@
             <label>Transaction Reference (Optional)</label>
             <input type="text" class="form-input" id="recordPayRef" placeholder="e.g. Txn-901283">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 4px;">
             <label>Payment Notes</label>
             <input type="text" class="form-input" id="recordPayNotes" placeholder="e.g. Cleared pending dues">
           </div>
@@ -1210,7 +1212,7 @@
     </div>
   </div>
 
-  <script src="/js/dashboard.js?v=2"></script>
+  <script src="/js/dashboard.js?v=6"></script>
 </body>
 
 </html>

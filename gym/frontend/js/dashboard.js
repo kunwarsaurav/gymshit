@@ -1909,22 +1909,29 @@ async function viewMemberProfile(memberId) {
     
     // Payment Status Badge
     const pBadge = document.getElementById('profilePaymentBadge');
-    pBadge.style.display = 'inline-block';
+    pBadge.style.display = 'inline-flex';
+    pBadge.className = 'badge';
     if (stats.totalOutstandingBalance === 0) {
-      pBadge.style.background = 'var(--green)';
-      pBadge.style.color = 'white';
+      pBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+      pBadge.style.color = '#059669';
+      pBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
       pBadge.textContent = 'PAID';
     } else {
-      pBadge.style.color = 'white';
       if (currentMembership && currentMembership.payment_status === 'OVERDUE') {
-        pBadge.style.background = '#ef4444';
-        pBadge.textContent = `OVERDUE: NPR ${stats.totalOutstandingBalance}`;
+        pBadge.style.background = 'rgba(239, 68, 68, 0.12)';
+        pBadge.style.color = '#dc2626';
+        pBadge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        pBadge.textContent = `OVERDUE: NPR ${stats.totalOutstandingBalance.toLocaleString()}`;
       } else if (stats.totalAmountPaid > 0) {
-        pBadge.style.background = '#f59e0b';
-        pBadge.textContent = `DUE: NPR ${stats.totalOutstandingBalance}`;
+        pBadge.style.background = 'rgba(245, 158, 11, 0.12)';
+        pBadge.style.color = '#d97706';
+        pBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+        pBadge.textContent = `DUE: NPR ${stats.totalOutstandingBalance.toLocaleString()}`;
       } else {
-        pBadge.style.background = '#64748b';
-        pBadge.textContent = `UNPAID: NPR ${stats.totalOutstandingBalance}`;
+        pBadge.style.background = 'rgba(100, 116, 139, 0.12)';
+        pBadge.style.color = '#475569';
+        pBadge.style.border = '1px solid rgba(100, 116, 139, 0.3)';
+        pBadge.textContent = `UNPAID: NPR ${stats.totalOutstandingBalance.toLocaleString()}`;
       }
     }
     
