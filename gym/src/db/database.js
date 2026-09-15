@@ -409,9 +409,9 @@ function addMember(member) {
   const stmt = db.prepare(`
     INSERT INTO members (
       full_name, phone, email, address, join_date, duration_months, expiry_date, plan_type, status, notes, avatar_path,
-      member_code, date_of_birth, gender, first_joining_date, emergency_contact_name, emergency_contact_phone, is_active
+      member_code, date_of_birth, gender, first_joining_date, emergency_contact_name, emergency_contact_phone, is_active, is_system_protected
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   const mCode = member.member_code || `FH-${Date.now()}`;
@@ -433,7 +433,8 @@ function addMember(member) {
     member.first_joining_date || member.join_date,
     member.emergency_contact_name || '',
     member.emergency_contact_phone || '',
-    member.is_active !== undefined ? member.is_active : 1
+    member.is_active !== undefined ? member.is_active : 1,
+    member.is_system_protected !== undefined ? member.is_system_protected : 0
   );
   
   const insertedId = result.lastInsertRowid;
@@ -461,11 +462,33 @@ function runInTransaction(fn) {
 
 function updateMember(id, member) {
   const existing = getMemberById(id);
+  if (!existing) {
+    throw new Error('Member not found.');
+  }
   const isProtected = existing && (existing.is_system_protected === 1 || existing.is_system_protected === '1');
-  let status = member.status || (existing ? existing.status : 'active');
+  let status = member.status !== undefined ? member.status : existing.status;
   if (isProtected) {
     status = 'active';
   }
+
+  const updatedFullName = member.full_name !== undefined ? member.full_name : existing.full_name;
+  const updatedPhone = member.phone !== undefined ? member.phone : existing.phone;
+  const updatedEmail = member.email !== undefined ? member.email : (existing.email || '');
+  const updatedAddress = member.address !== undefined ? member.address : (existing.address || '');
+  const updatedJoinDate = member.join_date !== undefined ? member.join_date : existing.join_date;
+  const updatedDurationMonths = member.duration_months !== undefined ? member.duration_months : existing.duration_months;
+  const updatedExpiryDate = member.expiry_date !== undefined ? member.expiry_date : existing.expiry_date;
+  const updatedPlanType = member.plan_type !== undefined ? member.plan_type : existing.plan_type;
+  const updatedNotes = member.notes !== undefined ? member.notes : (existing.notes || '');
+  const updatedAvatarPath = member.avatar_path !== undefined ? member.avatar_path : existing.avatar_path;
+  const updatedMemberCode = member.member_code !== undefined ? member.member_code : existing.member_code;
+  const updatedDateOfBirth = member.date_of_birth !== undefined ? member.date_of_birth : existing.date_of_birth;
+  const updatedGender = member.gender !== undefined ? member.gender : (existing.gender || 'male');
+  const updatedFirstJoin = member.first_joining_date !== undefined ? member.first_joining_date : (existing.first_joining_date || existing.join_date);
+  const updatedEmergName = member.emergency_contact_name !== undefined ? member.emergency_contact_name : (existing.emergency_contact_name || '');
+  const updatedEmergPhone = member.emergency_contact_phone !== undefined ? member.emergency_contact_phone : (existing.emergency_contact_phone || '');
+  const updatedIsActive = member.is_active !== undefined ? member.is_active : (existing.is_active !== undefined ? existing.is_active : 1);
+  const updatedIsProtected = member.is_system_protected !== undefined ? member.is_system_protected : (isProtected ? 1 : 0);
 
   const stmt = db.prepare(`
     UPDATE members SET
@@ -474,30 +497,30 @@ function updateMember(id, member) {
       status = ?, notes = ?, avatar_path = ?, 
       member_code = ?, date_of_birth = ?, gender = ?, first_joining_date = ?, 
       emergency_contact_name = ?, emergency_contact_phone = ?, is_active = ?,
-      is_system_protected = COALESCE(?, is_system_protected),
+      is_system_protected = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
   stmt.run(
-    capitalizeName(member.full_name),
-    member.phone,
-    member.email || '',
-    member.address || '',
-    member.join_date,
-    member.duration_months,
-    member.expiry_date,
-    member.plan_type,
+    capitalizeName(updatedFullName),
+    updatedPhone,
+    updatedEmail,
+    updatedAddress,
+    updatedJoinDate,
+    updatedDurationMonths,
+    updatedExpiryDate,
+    updatedPlanType,
     status,
-    member.notes || '',
-    member.avatar_path !== undefined ? member.avatar_path : null,
-    member.member_code,
-    member.date_of_birth || null,
-    member.gender || 'male',
-    member.first_joining_date,
-    member.emergency_contact_name || '',
-    member.emergency_contact_phone || '',
-    member.is_active !== undefined ? member.is_active : 1,
-    member.is_system_protected !== undefined ? member.is_system_protected : (isProtected ? 1 : 0),
+    updatedNotes,
+    updatedAvatarPath,
+    updatedMemberCode,
+    updatedDateOfBirth,
+    updatedGender,
+    updatedFirstJoin,
+    updatedEmergName,
+    updatedEmergPhone,
+    updatedIsActive,
+    updatedIsProtected,
     id
   );
   return getMemberById(id);
@@ -1117,7 +1140,7 @@ function getMembershipHistory(memberId) {
     FROM memberships ms
     LEFT JOIN plans p ON ms.plan_id = p.id
     WHERE ms.member_id = ?
-    ORDER BY ms.start_date DESC, ms.created_at DESC
+    ORDER BY ms.id DESC
   `).all(memberId);
 }
 
@@ -1129,7 +1152,7 @@ function getPaymentHistory(memberId) {
       FROM payments py
       JOIN memberships ms ON py.membership_id = ms.id
       WHERE py.member_id = ?
-      ORDER BY py.payment_date DESC, py.created_at DESC
+      ORDER BY py.id DESC
   `).all(memberId);
 }
 

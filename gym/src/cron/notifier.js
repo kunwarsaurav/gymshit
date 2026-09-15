@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const db = require('../db/database');
-const hikvision = require('../services/hikvisionService');
+const hikvision = require('../device/hikvisionService');
 
 let aakashSmsToken = null;
 

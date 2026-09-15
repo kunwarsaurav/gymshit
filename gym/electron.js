@@ -11,7 +11,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     title: 'GymPro',
-    icon: path.join(__dirname, 'public', 'images', 'logo.jpg'), // Ensure this exists or use a .ico file
+    icon: path.join(__dirname, 'frontend', 'images', 'logo.jpg'), // Ensure this exists or use a .ico file
     autoHideMenuBar: true, // Hides the default menu bar
     webPreferences: {
       nodeIntegration: false,
