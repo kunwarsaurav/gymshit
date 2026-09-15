@@ -159,6 +159,22 @@ async function runDailyCheck() {
   console.log('✅ Daily check complete.\n');
 }
 
+let isPollingHikvision = false;
+
+async function safePollAttendance() {
+  if (isPollingHikvision) {
+    return; // Previous poll is still in progress, skip to avoid socket congestion
+  }
+  isPollingHikvision = true;
+  try {
+    await hikvision.pollAndRecordAttendance();
+  } catch (err) {
+    console.error('[Hikvision Polling Error]:', err.message || err);
+  } finally {
+    isPollingHikvision = false;
+  }
+}
+
 // Start the cron scheduler
 function startScheduler() {
   initSMS();
@@ -170,18 +186,18 @@ function startScheduler() {
 
   console.log('⏰ Notification scheduler started (runs daily at 9:00 AM).');
 
-  // Poll Hikvision device every 5 seconds for attendance events
+  // Poll Hikvision device every 5 seconds safely (with mutex lock)
   cron.schedule('*/5 * * * * *', () => {
-    hikvision.pollAndRecordAttendance();
+    safePollAttendance();
   });
 
-  console.log('📋 Attendance polling started (every 5 seconds from Hikvision device).');
+  console.log('📋 Attendance polling started (every 5 seconds with mutex lock).');
 
   // Also run immediately on startup
   setTimeout(() => {
     runDailyCheck();
-    hikvision.pollAndRecordAttendance();
+    safePollAttendance();
   }, 2000);
 }
 
-module.exports = { startScheduler, sendSMS, notifyMember, runDailyCheck, initSMS };
+module.exports = { startScheduler, sendSMS, notifyMember, runDailyCheck, initSMS, safePollAttendance };

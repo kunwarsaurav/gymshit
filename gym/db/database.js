@@ -200,6 +200,33 @@ try { db.exec('ALTER TABLE members ADD COLUMN first_joining_date DATE;'); } catc
 try { db.exec('ALTER TABLE members ADD COLUMN emergency_contact_name TEXT;'); } catch(e){}
 try { db.exec('ALTER TABLE members ADD COLUMN emergency_contact_phone TEXT;'); } catch(e){}
 try { db.exec('ALTER TABLE members ADD COLUMN is_active INTEGER DEFAULT 1;'); } catch(e){}
+try { db.exec('ALTER TABLE members ADD COLUMN is_system_protected INTEGER DEFAULT 0;'); } catch(e){}
+
+// Set is_system_protected for foundational creator records
+try {
+  db.prepare(`
+    UPDATE members 
+    SET is_system_protected = 1 
+    WHERE LOWER(full_name) IN ('saurav kunwar', 'ashim pandey')
+  `).run();
+} catch (e) {}
+
+// ─── Performance Indexes ──────────────────────────────────────
+try {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_members_phone ON members(phone);
+    CREATE INDEX IF NOT EXISTS idx_members_status ON members(status);
+    CREATE INDEX IF NOT EXISTS idx_memberships_member_id ON memberships(member_id);
+    CREATE INDEX IF NOT EXISTS idx_memberships_status ON memberships(membership_status);
+    CREATE INDEX IF NOT EXISTS idx_payments_member_id ON payments(member_id);
+    CREATE INDEX IF NOT EXISTS idx_payments_membership_id ON payments(membership_id);
+    CREATE INDEX IF NOT EXISTS idx_attendance_member_id ON attendance(member_id);
+    CREATE INDEX IF NOT EXISTS idx_attendance_date_shift ON attendance(date, shift);
+    CREATE INDEX IF NOT EXISTS idx_logistics_tx_product_id ON logistics_transactions(product_id);
+  `);
+} catch (e) {
+  console.error('Index creation error:', e);
+}
 
 try {
   db.exec('ALTER TABLE members ADD COLUMN expiry_date DATE;');
@@ -419,10 +446,24 @@ function addMember(member) {
   return getMemberById(insertedId);
 }
 
+// ─── Transaction Helper ─────────────────────────────────────
+function runInTransaction(fn) {
+  db.exec('BEGIN IMMEDIATE TRANSACTION;');
+  try {
+    const result = fn();
+    db.exec('COMMIT;');
+    return result;
+  } catch (error) {
+    try { db.exec('ROLLBACK;'); } catch (e) {}
+    throw error;
+  }
+}
+
 function updateMember(id, member) {
-  const protectedNames = ['saurav kunwar', 'ashim pandey'];
-  let status = member.status || 'active';
-  if (protectedNames.includes(member.full_name.toLowerCase())) {
+  const existing = getMemberById(id);
+  const isProtected = existing && (existing.is_system_protected === 1 || existing.is_system_protected === '1');
+  let status = member.status || (existing ? existing.status : 'active');
+  if (isProtected) {
     status = 'active';
   }
 
@@ -433,6 +474,7 @@ function updateMember(id, member) {
       status = ?, notes = ?, avatar_path = ?, 
       member_code = ?, date_of_birth = ?, gender = ?, first_joining_date = ?, 
       emergency_contact_name = ?, emergency_contact_phone = ?, is_active = ?,
+      is_system_protected = COALESCE(?, is_system_protected),
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `);
@@ -455,6 +497,7 @@ function updateMember(id, member) {
     member.emergency_contact_name || '',
     member.emergency_contact_phone || '',
     member.is_active !== undefined ? member.is_active : 1,
+    member.is_system_protected !== undefined ? member.is_system_protected : (isProtected ? 1 : 0),
     id
   );
   return getMemberById(id);
@@ -462,11 +505,8 @@ function updateMember(id, member) {
 
 function deleteMember(id) {
   const existing = getMemberById(id);
-  if (existing) {
-    const protectedNames = ['saurav kunwar', 'ashim pandey'];
-    if (protectedNames.includes(existing.full_name.toLowerCase())) {
-      throw new Error('Protected members cannot be deleted.');
-    }
+  if (existing && (existing.is_system_protected === 1 || existing.is_system_protected === '1')) {
+    throw new Error('System protected members cannot be deleted.');
   }
   return db.prepare('DELETE FROM members WHERE id = ?').run(id);
 }
@@ -510,10 +550,8 @@ function updateExpiredMembers() {
   now.setHours(0, 0, 0, 0);
   let count = 0;
 
-  const protectedNames = ['saurav kunwar', 'ashim pandey'];
-
   for (const m of allActive) {
-    if (protectedNames.includes(m.full_name.toLowerCase())) {
+    if (m.is_system_protected === 1 || m.is_system_protected === '1') {
       continue;
     }
     const expiry = new Date(m.expiry_date);
@@ -785,44 +823,117 @@ function logAudit(userId, action, entityType, entityId, oldValues, newValues, de
 }
 
 function createMembership(memberId, planId, details, paymentDetails, user = 'Admin') {
-  const todayStr = new Date().toISOString().split('T')[0];
-  let status = 'ACTIVE';
-  if (details.start_date > todayStr) {
-    status = 'UPCOMING';
-  }
-  
-  const finalPayable = parseFloat(details.final_payable_amount);
-  const amountPaid = parseFloat(paymentDetails.amount_paid || 0);
-  
-  let payStatus = 'UNPAID';
-  if (amountPaid > 0) {
-    payStatus = amountPaid >= finalPayable ? 'PAID' : 'PARTIALLY_PAID';
-  }
-  
-  if (payStatus !== 'PAID' && details.payment_due_date && details.payment_due_date < todayStr) {
-    payStatus = 'OVERDUE';
-  }
+  return runInTransaction(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    let status = 'ACTIVE';
+    if (details.start_date > todayStr) {
+      status = 'UPCOMING';
+    }
+    
+    const finalPayable = parseFloat(details.final_payable_amount);
+    const amountPaid = parseFloat(paymentDetails.amount_paid || 0);
+    
+    let payStatus = 'UNPAID';
+    if (amountPaid > 0) {
+      payStatus = amountPaid >= finalPayable ? 'PAID' : 'PARTIALLY_PAID';
+    }
+    
+    if (payStatus !== 'PAID' && details.payment_due_date && details.payment_due_date < todayStr) {
+      payStatus = 'OVERDUE';
+    }
 
-  const planName = details.plan_name_snapshot || 'Custom Plan';
+    const planName = details.plan_name_snapshot || 'Custom Plan';
 
-  const mStmt = db.prepare(`
-    INSERT INTO memberships (
-      member_id, plan_id, plan_name_snapshot, start_date, end_date,
-      original_price, discount_type, discount_amount, final_payable_amount,
-      payment_due_date, membership_status, payment_status, notes, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  
-  const mResult = mStmt.run(
-    memberId, planId || null, planName, details.start_date, details.end_date,
-    parseFloat(details.original_price), details.discount_type || 'NONE',
-    parseFloat(details.discount_amount || 0), finalPayable,
-    details.payment_due_date || null, status, payStatus, details.notes || '', user
-  );
-  
-  const membershipId = mResult.lastInsertRowid;
+    const mStmt = db.prepare(`
+      INSERT INTO memberships (
+        member_id, plan_id, plan_name_snapshot, start_date, end_date,
+        original_price, discount_type, discount_amount, final_payable_amount,
+        payment_due_date, membership_status, payment_status, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const mResult = mStmt.run(
+      memberId, planId || null, planName, details.start_date, details.end_date,
+      parseFloat(details.original_price), details.discount_type || 'NONE',
+      parseFloat(details.discount_amount || 0), finalPayable,
+      details.payment_due_date || null, status, payStatus, details.notes || '', user
+    );
+    
+    const membershipId = mResult.lastInsertRowid;
 
-  if (amountPaid > 0) {
+    if (amountPaid > 0) {
+      const receiptNum = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const pStmt = db.prepare(`
+        INSERT INTO payments (
+          member_id, membership_id, amount, payment_method, payment_date,
+          transaction_reference, receipt_number, notes, payment_status, recorded_by
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
+      `);
+      pStmt.run(
+        memberId, membershipId, amountPaid, paymentDetails.payment_method || 'Cash',
+        paymentDetails.transaction_reference || '', receiptNum,
+        paymentDetails.notes || 'Initial payment', 'COMPLETED', user
+      );
+    }
+
+    logAudit(null, 'CREATE_MEMBERSHIP', 'memberships', membershipId, null, JSON.stringify(details), `Membership created for plan ${planName}`);
+    
+    // Sync the status of members
+    updateMembershipStatuses();
+
+    return membershipId;
+  });
+}
+
+function renewMembership(memberId, planId, details, paymentDetails, user = 'Admin') {
+  return runInTransaction(() => {
+    db.prepare(`
+      UPDATE memberships 
+      SET membership_status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP 
+      WHERE member_id = ? AND membership_status = 'ACTIVE'
+    `).run(memberId);
+
+    return createMembership(memberId, planId, details, paymentDetails, user);
+  });
+}
+
+function recordPayment(memberId, membershipId, amount, details, user = 'Admin') {
+  return runInTransaction(() => {
+    const finalAmount = parseFloat(amount);
+    if (isNaN(finalAmount) || finalAmount <= 0) {
+      throw new Error('Payment amount must be greater than zero.');
+    }
+
+    const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(membershipId);
+    if (!ms) throw new Error('Membership record not found.');
+
+    const paidRow = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total_paid
+      FROM payments
+      WHERE membership_id = ? AND payment_status = 'COMPLETED'
+    `).get(membershipId);
+    const currentPaid = paidRow ? paidRow.total_paid : 0;
+    
+    const remaining = ms.final_payable_amount - currentPaid;
+    if (finalAmount > remaining) {
+      throw new Error(`Amount exceeds outstanding balance of NPR ${remaining}`);
+    }
+
+    const newTotalPaid = currentPaid + finalAmount;
+    let newPayStatus = 'PARTIALLY_PAID';
+    if (newTotalPaid >= ms.final_payable_amount) {
+      newPayStatus = 'PAID';
+    } else if (newTotalPaid > 0) {
+      newPayStatus = 'PARTIALLY_PAID';
+    } else {
+      newPayStatus = 'UNPAID';
+    }
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (newPayStatus !== 'PAID' && ms.payment_due_date && ms.payment_due_date < todayStr) {
+      newPayStatus = 'OVERDUE';
+    }
+
     const receiptNum = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const pStmt = db.prepare(`
       INSERT INTO payments (
@@ -831,130 +942,65 @@ function createMembership(memberId, planId, details, paymentDetails, user = 'Adm
       ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
     `);
     pStmt.run(
-      memberId, membershipId, amountPaid, paymentDetails.payment_method || 'Cash',
-      paymentDetails.transaction_reference || '', receiptNum,
-      paymentDetails.notes || 'Initial payment', 'COMPLETED', user
+      memberId, membershipId, finalAmount, details.payment_method || 'Cash',
+      details.transaction_reference || '', receiptNum,
+      details.notes || 'Subsequent payment', 'COMPLETED', user
     );
-  }
 
-  logAudit(null, 'CREATE_MEMBERSHIP', 'memberships', membershipId, null, JSON.stringify(details), `Membership created for plan ${planName}`);
-  
-  // Sync the status of members
-  updateMembershipStatuses();
+    db.prepare('UPDATE memberships SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(newPayStatus, membershipId);
 
-  return membershipId;
-}
+    logAudit(null, 'RECORD_PAYMENT', 'payments', receiptNum, null, null, `Payment of NPR ${finalAmount} recorded for receipt ${receiptNum}`);
 
-function renewMembership(memberId, planId, details, paymentDetails, user = 'Admin') {
-  db.prepare(`
-    UPDATE memberships 
-    SET membership_status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP 
-    WHERE member_id = ? AND membership_status = 'ACTIVE'
-  `).run(memberId);
-
-  return createMembership(memberId, planId, details, paymentDetails, user);
-}
-
-function recordPayment(memberId, membershipId, amount, details, user = 'Admin') {
-  const finalAmount = parseFloat(amount);
-  if (isNaN(finalAmount) || finalAmount <= 0) {
-    throw new Error('Payment amount must be greater than zero.');
-  }
-
-  const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(membershipId);
-  if (!ms) throw new Error('Membership record not found.');
-
-  const paidRow = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total_paid
-    FROM payments
-    WHERE membership_id = ? AND payment_status = 'COMPLETED'
-  `).get(membershipId);
-  const currentPaid = paidRow ? paidRow.total_paid : 0;
-  
-  const remaining = ms.final_payable_amount - currentPaid;
-  if (finalAmount > remaining) {
-    throw new Error(`Amount exceeds outstanding balance of NPR ${remaining}`);
-  }
-
-  const newTotalPaid = currentPaid + finalAmount;
-  let newPayStatus = 'PARTIALLY_PAID';
-  if (newTotalPaid >= ms.final_payable_amount) {
-    newPayStatus = 'PAID';
-  } else if (newTotalPaid > 0) {
-    newPayStatus = 'PARTIALLY_PAID';
-  } else {
-    newPayStatus = 'UNPAID';
-  }
-  
-  const todayStr = new Date().toISOString().split('T')[0];
-  if (newPayStatus !== 'PAID' && ms.payment_due_date && ms.payment_due_date < todayStr) {
-    newPayStatus = 'OVERDUE';
-  }
-
-  const receiptNum = `RCP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const pStmt = db.prepare(`
-    INSERT INTO payments (
-      member_id, membership_id, amount, payment_method, payment_date,
-      transaction_reference, receipt_number, notes, payment_status, recorded_by
-    ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)
-  `);
-  pStmt.run(
-    memberId, membershipId, finalAmount, details.payment_method || 'Cash',
-    details.transaction_reference || '', receiptNum,
-    details.notes || 'Subsequent payment', 'COMPLETED', user
-  );
-
-  db.prepare('UPDATE memberships SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .run(newPayStatus, membershipId);
-
-  logAudit(null, 'RECORD_PAYMENT', 'payments', receiptNum, null, null, `Payment of NPR ${finalAmount} recorded for receipt ${receiptNum}`);
-
-  return receiptNum;
+    return receiptNum;
+  });
 }
 
 function reversePayment(paymentId, reason, user = 'Admin') {
-  const p = db.prepare('SELECT * FROM payments WHERE id = ?').get(paymentId);
-  if (!p) throw new Error('Payment record not found.');
-  if (p.payment_status === 'REVERSED') throw new Error('Payment is already reversed.');
+  return runInTransaction(() => {
+    const p = db.prepare('SELECT * FROM payments WHERE id = ?').get(paymentId);
+    if (!p) throw new Error('Payment record not found.');
+    if (p.payment_status === 'REVERSED') throw new Error('Payment is already reversed.');
 
-  db.prepare("UPDATE payments SET payment_status = 'REVERSED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .run(paymentId);
+    db.prepare("UPDATE payments SET payment_status = 'REVERSED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(paymentId);
 
-  db.prepare(`
-    INSERT INTO payment_adjustments (payment_id, membership_id, adjustment_type, amount, reason, created_by)
-    VALUES (?, ?, 'REVERSAL', ?, ?, ?)
-  `).run(p.id, p.membership_id, p.amount, reason, user);
+    db.prepare(`
+      INSERT INTO payment_adjustments (payment_id, membership_id, adjustment_type, amount, reason, created_by)
+      VALUES (?, ?, 'REVERSAL', ?, ?, ?)
+    `).run(p.id, p.membership_id, p.amount, reason, user);
 
-  const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(p.membership_id);
-  if (ms) {
-    const paidRow = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_paid
-      FROM payments
-      WHERE membership_id = ? AND payment_status = 'COMPLETED'
-    `).get(p.membership_id);
-    const newPaid = paidRow ? paidRow.total_paid : 0;
-    
-    let newPayStatus = 'UNPAID';
-    if (newPaid >= ms.final_payable_amount) {
-      newPayStatus = 'PAID';
-    } else if (newPaid > 0) {
-      newPayStatus = 'PARTIALLY_PAID';
-    } else {
-      newPayStatus = 'UNPAID';
+    const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(p.membership_id);
+    if (ms) {
+      const paidRow = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total_paid
+        FROM payments
+        WHERE membership_id = ? AND payment_status = 'COMPLETED'
+      `).get(p.membership_id);
+      const newPaid = paidRow ? paidRow.total_paid : 0;
+      
+      let newPayStatus = 'UNPAID';
+      if (newPaid >= ms.final_payable_amount) {
+        newPayStatus = 'PAID';
+      } else if (newPaid > 0) {
+        newPayStatus = 'PARTIALLY_PAID';
+      } else {
+        newPayStatus = 'UNPAID';
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (newPayStatus !== 'PAID' && ms.payment_due_date && ms.payment_due_date < todayStr) {
+        newPayStatus = 'OVERDUE';
+      }
+
+      db.prepare('UPDATE memberships SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(newPayStatus, ms.id);
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (newPayStatus !== 'PAID' && ms.payment_due_date && ms.payment_due_date < todayStr) {
-      newPayStatus = 'OVERDUE';
-    }
+    logAudit(null, 'REVERSE_PAYMENT', 'payments', p.id, JSON.stringify(p), null, `Payment of NPR ${p.amount} reversed. Reason: ${reason}`);
 
-    db.prepare('UPDATE memberships SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(newPayStatus, ms.id);
-  }
-
-  logAudit(null, 'REVERSE_PAYMENT', 'payments', p.id, JSON.stringify(p), null, `Payment of NPR ${p.amount} reversed. Reason: ${reason}`);
-
-  return true;
+    return true;
+  });
 }
 
 function getMemberProfile(memberId) {
@@ -1179,7 +1225,9 @@ function updateMembershipStatuses() {
   `).all().map(r => r.member_id);
 
   db.prepare(`
-    UPDATE members SET status = 'expired'
+    UPDATE members 
+    SET status = 'expired'
+    WHERE is_system_protected = 0 OR is_system_protected IS NULL
   `).run();
 
   if (activeMemberships.length > 0) {
@@ -1191,29 +1239,31 @@ function updateMembershipStatuses() {
 }
 
 function freezeMembership(membershipId, days, reason, user = 'Admin') {
-  const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(membershipId);
-  if (!ms) throw new Error('Membership not found.');
-  if (ms.membership_status !== 'ACTIVE') throw new Error('Only active memberships can be frozen.');
+  return runInTransaction(() => {
+    const ms = db.prepare('SELECT * FROM memberships WHERE id = ?').get(membershipId);
+    if (!ms) throw new Error('Membership not found.');
+    if (ms.membership_status !== 'ACTIVE') throw new Error('Only active memberships can be frozen.');
 
-  const originalEndDate = new Date(ms.end_date);
-  originalEndDate.setDate(originalEndDate.getDate() + parseInt(days));
-  const newEndDate = originalEndDate.toISOString().split('T')[0];
+    const originalEndDate = new Date(ms.end_date);
+    originalEndDate.setDate(originalEndDate.getDate() + parseInt(days));
+    const newEndDate = originalEndDate.toISOString().split('T')[0];
 
-  db.prepare(`
-    UPDATE memberships
-    SET membership_status = 'FROZEN', end_date = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(newEndDate, membershipId);
+    db.prepare(`
+      UPDATE memberships
+      SET membership_status = 'FROZEN', end_date = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newEndDate, membershipId);
 
-  db.prepare(`
-    INSERT INTO membership_status_history (membership_id, previous_status, new_status, reason, changed_by)
-    VALUES (?, 'ACTIVE', 'FROZEN', ?, ?)
-  `).run(membershipId, `Frozen for ${days} days. Reason: ${reason}`, user);
+    db.prepare(`
+      INSERT INTO membership_status_history (membership_id, previous_status, new_status, reason, changed_by)
+      VALUES (?, 'ACTIVE', 'FROZEN', ?, ?)
+    `).run(membershipId, `Frozen for ${days} days. Reason: ${reason}`, user);
 
-  logAudit(null, 'FREEZE_MEMBERSHIP', 'memberships', membershipId, null, null, `Membership frozen for ${days} days. New expiry: ${newEndDate}`);
-  updateMembershipStatuses();
+    logAudit(null, 'FREEZE_MEMBERSHIP', 'memberships', membershipId, null, null, `Membership frozen for ${days} days. New expiry: ${newEndDate}`);
+    updateMembershipStatuses();
 
-  return true;
+    return true;
+  });
 }
 
 module.exports = {

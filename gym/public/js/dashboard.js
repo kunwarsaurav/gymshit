@@ -34,6 +34,14 @@ function showToast(message, type = 'success') {
   setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
 }
 
+// ─── HTML Sanitization ────────────────────────
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
 // ─── Navigation ───────────────────────────────
 const navItems = document.querySelectorAll('.nav-item[data-page]');
 const pages = document.querySelectorAll('.page-section');
@@ -203,7 +211,7 @@ function renderMembers(members) {
         <div class="actions-cell">
           <button class="action-btn" title="Edit" onclick="editMember(${m.id})">✏️</button>
           <button class="action-btn notify" title="Send Notification" onclick="sendNotification(${m.id}, 'expiry_warning')">📨</button>
-          ${['saurav kunwar', 'ashim pandey'].includes(m.full_name.trim().toLowerCase())
+          ${(m.is_system_protected === 1 || m.is_system_protected === '1')
             ? `<button class="action-btn delete" title="Protected Member" style="opacity: 0.4; cursor: not-allowed;" disabled>🔒</button>`
             : `<button class="action-btn delete" title="Delete" onclick="confirmDelete(${m.id}, '${escapeHtml(m.full_name)}')">🗑️</button>`
           }

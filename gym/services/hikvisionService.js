@@ -333,10 +333,12 @@ async function denyAccess(employeeNo, reason) {
  * 6. setupLanConnection()
  * Configures the Hikvision device to push attendance events to the laptop over the LAN.
  */
-async function setupLanConnection() {
+async function setupLanConnection(customLaptopIp = null, customPort = null) {
   try {
     const config = getHikvisionConfig();
-    const laptopIp = getLocalIp();
+    const savedLaptopIp = db.getSetting ? db.getSetting('laptop_ip', '') : '';
+    const laptopIp = customLaptopIp || savedLaptopIp || getLocalIp();
+    const activePort = customPort || process.env.PORT || '3000';
     
     if (!config.ip) return { success: false, message: 'Hikvision IP not configured' };
 
@@ -351,7 +353,7 @@ async function setupLanConnection() {
     <parameterFormatType>JSON</parameterFormatType>
     <addressingFormatType>ipaddress</addressingFormatType>
     <ipAddress>${laptopIp}</ipAddress>
-    <portNo>3001</portNo>
+    <portNo>${activePort}</portNo>
     <httpAuthenticationMethod>none</httpAuthenticationMethod>
   </HttpHostNotification>
 </HttpHostNotificationList>`;
@@ -363,8 +365,8 @@ async function setupLanConnection() {
     }, config);
 
     if (response.ok) {
-      console.log(`[Hikvision] LAN connection established. Device will push events to ${laptopIp}:3000`);
-      return { success: true, message: 'LAN Connection established successfully!' };
+      console.log(`[Hikvision] LAN connection established. Device will push events to ${laptopIp}:${activePort}`);
+      return { success: true, message: `LAN Connection established successfully on ${laptopIp}:${activePort}!` };
     } else {
       console.error(`[Hikvision] Failed to setup LAN connection. Status: ${response.status}`);
       return { success: false, message: `Failed to configure device, status ${response.status}` };

@@ -1,11 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const db = require('./db/database');
 const { dbEvents } = require('./db/database');
-const { requireAuth, requirePageAuth } = require('./middleware/auth');
+const { requireAuth, requirePageAuth, requireDeviceAuth } = require('./middleware/auth');
 const { startScheduler, sendSMS, notifyMember, initSMS } = require('./cron/notifier');
 const hikvision = require('./services/hikvisionService');
 const fs = require('fs');
@@ -15,6 +16,14 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+const allowedMimes = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif'
+};
+
 function saveBase64Image(base64Data, filenamePrefix = 'logistics') {
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return null;
@@ -23,11 +32,16 @@ function saveBase64Image(base64Data, filenamePrefix = 'logistics') {
   if (!matches || matches.length !== 3) {
     return null;
   }
-  const contentType = matches[1];
-  const extension = contentType.split('/')[1] || 'png';
+  const contentType = matches[1].toLowerCase();
+  const extension = allowedMimes[contentType] || 'png';
   const base64Content = matches[2];
   const buffer = Buffer.from(base64Content, 'base64');
-  const filename = `${filenamePrefix}_${Date.now()}.${extension}`;
+
+  if (buffer.length > 10 * 1024 * 1024) {
+    throw new Error('Image exceeds 10MB limit.');
+  }
+
+  const filename = `${filenamePrefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}.${extension}`;
   const filepath = path.join(uploadsDir, filename);
   fs.writeFileSync(filepath, buffer);
   return `/uploads/${filename}`;
@@ -39,11 +53,22 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ──────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+const sessionDbDir = process.env.GYMPRO_DB_DIR || path.join(__dirname, 'db');
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'gym-secret-key',
+  store: new SQLiteStore({
+    db: 'sessions.db',
+    dir: sessionDbDir,
+    concurrentDB: true
+  }),
+  secret: process.env.SESSION_SECRET || 'gym-secret-key-fit24',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+  cookie: { 
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days persistent session
+    httpOnly: true,
+    sameSite: 'lax'
+  }
 }));
 
 // Block direct access to dashboard.html to enforce authentication via /dashboard route
@@ -242,8 +267,7 @@ app.put('/api/members/:id', requireAuth, (req, res) => {
     }
 
     let finalStatus = status || existing.status;
-    const protectedNames = ['saurav kunwar', 'ashim pandey'];
-    if (protectedNames.includes(existing.full_name.toLowerCase()) || (full_name && protectedNames.includes(full_name.toLowerCase()))) {
+    if (existing.is_system_protected === 1 || existing.is_system_protected === '1') {
       finalStatus = 'active';
     }
 
@@ -284,9 +308,8 @@ app.delete('/api/members/:id', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'Member not found.' });
   }
 
-  const protectedNames = ['saurav kunwar', 'ashim pandey'];
-  if (protectedNames.includes(existing.full_name.toLowerCase())) {
-    return res.status(403).json({ error: 'Saurav Kunwar and Ashim Pandey are protected members and cannot be deleted.' });
+  if (existing.is_system_protected === 1 || existing.is_system_protected === '1') {
+    return res.status(403).json({ error: 'System protected members cannot be deleted.' });
   }
 
   try {
@@ -435,26 +458,53 @@ app.get('/api/attendance/summary', requireAuth, (req, res) => {
 
 // ─── SERVER-SENT EVENTS (SSE) ────────────────────────────────
 const sseClients = new Set();
+
 app.get('/api/attendance/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
 
   const sendEvent = (data) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    try {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch (err) {
+      sseClients.delete(sendEvent);
+    }
   };
 
   sseClients.add(sendEvent);
 
+  // Keep-alive heartbeat every 25 seconds to keep connection active and detect closed sockets
+  const keepAliveInterval = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch (err) {
+      clearInterval(keepAliveInterval);
+      sseClients.delete(sendEvent);
+    }
+  }, 25000);
+
   req.on('close', () => {
+    clearInterval(keepAliveInterval);
     sseClients.delete(sendEvent);
   });
 });
 
 dbEvents.on('attendance', (data) => {
-  const member = db.getMemberById(data.memberId);
-  const eventData = { ...data, member_name: member ? member.full_name : 'Unknown' };
-  sseClients.forEach(client => client(eventData));
+  try {
+    const member = db.getMemberById(data.memberId);
+    const eventData = { ...data, member_name: member ? member.full_name : 'Unknown' };
+    sseClients.forEach(client => {
+      try {
+        client(eventData);
+      } catch (e) {
+        sseClients.delete(client);
+      }
+    });
+  } catch (err) {
+    console.error('[SSE Attendance Broadcast Error]:', err.message || err);
+  }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -926,7 +976,7 @@ app.post('/api/hikvision/setup-lan', requireAuth, async (req, res) => {
 // ─── REAL-TIME AUTH CHECK (called by Hikvision BEFORE opening door) ──────────
 // The device POSTs to this endpoint when someone scans their fingerprint.
 // We check DB and respond 200 (allow) or 401 (deny).
-app.post('/api/hikvision/auth', async (req, res) => {
+app.post('/api/hikvision/auth', requireDeviceAuth, async (req, res) => {
   try {
     const body = req.body;
     // Extract Employee No from various Hikvision event formats
@@ -968,7 +1018,7 @@ app.post('/api/hikvision/auth', async (req, res) => {
 });
 
 // Legacy event webhook (fires AFTER door opens - kept for logging)
-app.post('/api/hikvision/event', async (req, res) => {
+app.post('/api/hikvision/event', requireDeviceAuth, async (req, res) => {
   // Usually this does not requireAuth because it comes directly from the device
   const eventData = req.body;
   

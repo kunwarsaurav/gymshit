@@ -14,4 +14,28 @@ function requirePageAuth(req, res, next) {
   return res.redirect('/');
 }
 
-module.exports = { requireAuth, requirePageAuth };
+const db = require('../db/database');
+
+// Device authentication middleware - ensures webhooks come from configured device, localhost, or active admin
+function requireDeviceAuth(req, res, next) {
+  const configuredDeviceIp = db.getSetting ? db.getSetting('hikvision_ip', '') : '';
+  const rawIp = req.ip || (req.socket && req.socket.remoteAddress) || '';
+  const clientIp = rawIp.replace(/^.*:/, ''); // Normalize IPv6 mapped IPv4 like ::ffff:192.168.1.182
+
+  if (
+    clientIp === '127.0.0.1' ||
+    clientIp === 'localhost' ||
+    (configuredDeviceIp && clientIp === configuredDeviceIp)
+  ) {
+    return next();
+  }
+
+  if (req.session && req.session.admin) {
+    return next();
+  }
+
+  console.warn(`[Security Alert] Unauthorized access attempt to device API from IP: ${clientIp}`);
+  return res.status(403).json({ error: 'Forbidden: Device IP not authorized' });
+}
+
+module.exports = { requireAuth, requirePageAuth, requireDeviceAuth };
