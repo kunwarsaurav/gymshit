@@ -2408,7 +2408,7 @@ freezeForm?.addEventListener('submit', async (e) => {
 // ─── Outstanding Dues Dashboard Page ───
 async function loadDuesPage() {
   try {
-    const res = await fetch('/api/dues');
+    const res = await fetch('/api/payments/dues');
     const data = await res.json();
     
     const { stats, dues } = data;
