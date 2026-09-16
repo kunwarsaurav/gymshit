@@ -1289,6 +1289,67 @@ function freezeMembership(membershipId, days, reason, user = 'Admin') {
   });
 }
 
+function getAnalyticsReport(startDate, endDate) {
+  const dateCondition = "date(payment_date) >= date(?) AND date(payment_date) <= date(?)";
+  const joinCondition = "date(join_date) >= date(?) AND date(join_date) <= date(?)";
+  const expireCondition = "date(end_date) >= date(?) AND date(end_date) <= date(?)";
+  const attendanceCondition = "date(date) >= date(?) AND date(date) <= date(?)";
+  const membershipCondition = "date(start_date) >= date(?) AND date(start_date) <= date(?)";
+
+  // 1. Growth & Member Base
+  const totalActive = db.prepare(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`).get().count;
+  const newSignups = db.prepare(`SELECT COUNT(*) as count FROM members WHERE ${joinCondition}`).get(startDate, endDate).count;
+  const churned = db.prepare(`SELECT COUNT(DISTINCT member_id) as count FROM memberships WHERE membership_status = 'EXPIRED' AND ${expireCondition}`).get(startDate, endDate).count;
+
+  // 2. Financial Health
+  const revenue = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE payment_status = 'COMPLETED' AND ${dateCondition}`).get(startDate, endDate).total;
+  
+  const paymentMethodsRaw = db.prepare(`SELECT payment_method, COALESCE(SUM(amount), 0) as total FROM payments WHERE payment_status = 'COMPLETED' AND ${dateCondition} GROUP BY payment_method`).all(startDate, endDate);
+  const paymentMethods = paymentMethodsRaw.reduce((acc, curr) => {
+    acc[curr.payment_method] = curr.total;
+    return acc;
+  }, {});
+
+  const duesData = getOutstandingDues();
+  const outstandingDues = duesData.stats.totalOutstandingAmount;
+
+  // 3. Plan Popularity
+  const planSales = db.prepare(`
+    SELECT plan_name_snapshot as name, COUNT(id) as count, COALESCE(SUM(final_payable_amount), 0) as revenue
+    FROM memberships
+    WHERE ${membershipCondition}
+    GROUP BY plan_name_snapshot
+    ORDER BY revenue DESC
+  `).all(startDate, endDate);
+
+  // 4. Retention & Engagement
+  const totalAttendance = db.prepare(`SELECT COUNT(*) as count FROM attendance WHERE ${attendanceCondition}`).get(startDate, endDate).count;
+  const morningShift = db.prepare(`SELECT COUNT(*) as count FROM attendance WHERE shift = 'morning' AND ${attendanceCondition}`).get(startDate, endDate).count;
+  const dayShift = db.prepare(`SELECT COUNT(*) as count FROM attendance WHERE shift = 'day' AND ${attendanceCondition}`).get(startDate, endDate).count;
+
+  return {
+    period: `${startDate} to ${endDate}`,
+    startDate,
+    endDate,
+    growth: {
+      totalActive,
+      newSignups,
+      churned
+    },
+    financials: {
+      revenue,
+      paymentMethods,
+      outstandingDues
+    },
+    planSales,
+    retention: {
+      totalAttendance,
+      morningShift,
+      dayShift
+    }
+  };
+}
+
 module.exports = {
   db,
   dbEvents,
@@ -1335,5 +1396,6 @@ module.exports = {
   getPaymentHistory,
   getOutstandingDues,
   updateMembershipStatuses,
-  freezeMembership
+  freezeMembership,
+  getAnalyticsReport
 };

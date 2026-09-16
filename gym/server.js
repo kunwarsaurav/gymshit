@@ -59,6 +59,7 @@ app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
 app.use('/api/notifications', require('./src/routes/notificationRoutes'));
 app.use('/api/payments', require('./src/routes/paymentRoutes'));
 app.use('/api/memberships', require('./src/routes/membershipRoutes'));
+app.use('/api/reports', require('./src/routes/reportRoutes'));
 // Backward compatible packages route
 app.use('/api', require('./src/routes/planRoutes')); // Since we put /packages in planRoutes but as relative router.get('/packages')
 

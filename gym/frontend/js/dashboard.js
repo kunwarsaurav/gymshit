@@ -65,6 +65,7 @@ function navigateTo(page) {
   if (page === 'notifications') loadNotifications();
   if (page === 'logistics') loadLogistics();
   if (page === 'dues') loadDuesPage();
+  if (page === 'reports') loadReportsPage();
 }
 
 navItems.forEach(item => {
@@ -2463,3 +2464,434 @@ function formatDateTime(dateStr) {
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+// ═══════════════════════════════════════════════
+// REPORTS & ANALYTICS
+// ═══════════════════════════════════════════════
+// REPORTS & ANALYTICS
+// ═══════════════════════════════════════════════
+let currentReportData = null;
+
+function setReportDateRange(rangeType) {
+  const startInput = document.getElementById('reportStartDate');
+  const endInput = document.getElementById('reportEndDate');
+  if (!startInput || !endInput) return;
+
+  const today = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
+  const formatD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  let startDate = new Date();
+  let endDate = new Date(today);
+
+  if (rangeType === 'this_month') {
+    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  } else if (rangeType === 'last_30') {
+    startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (rangeType === 'last_90') {
+    startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+  } else if (rangeType === 'this_year') {
+    startDate = new Date(today.getFullYear(), 0, 1);
+  } else if (rangeType === 'all_time') {
+    startDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  }
+
+  startInput.value = formatD(startDate);
+  endInput.value = formatD(endDate);
+  loadReportsPage();
+}
+window.setReportDateRange = setReportDateRange;
+
+// Initialize Date inputs to this month if empty
+(function initReportDates() {
+  const startInput = document.getElementById('reportStartDate');
+  const endInput = document.getElementById('reportEndDate');
+  if (startInput && endInput && !startInput.value) {
+    const today = new Date();
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    const pad = (n) => n.toString().padStart(2, '0');
+    startInput.value = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-01`;
+    endInput.value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  }
+})();
+
+async function loadReportsPage() {
+  const startInput = document.getElementById('reportStartDate');
+  const endInput = document.getElementById('reportEndDate');
+  
+  if (!startInput || !endInput) return;
+
+  if (!startInput.value || !endInput.value) {
+    const today = new Date();
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    const pad = (n) => n.toString().padStart(2, '0');
+    if (!startInput.value) startInput.value = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-01`;
+    if (!endInput.value) endInput.value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  }
+
+  const sDate = startInput.value;
+  const eDate = endInput.value;
+  
+  try {
+    const res = await fetch(`/api/reports/analytics?startDate=${sDate}&endDate=${eDate}`);
+    if (!res.ok) throw new Error('Failed to fetch analytics');
+    const data = await res.json();
+    currentReportData = data;
+
+    // Update UI Mini-Previews
+    const netGrowth = data.growth.newSignups - data.growth.churned;
+    const netGrowthSign = netGrowth >= 0 ? `+${netGrowth}` : `${netGrowth}`;
+    const netGrowthColor = netGrowth >= 0 ? 'var(--green)' : 'var(--red)';
+
+    const previewGrowth = document.getElementById('previewGrowth');
+    if (previewGrowth) {
+      previewGrowth.innerHTML = `
+        <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary);">${data.growth.totalActive} Active Members</div>
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:2px;">
+          <span style="color:var(--green); font-weight:600;">+${data.growth.newSignups} New</span> &bull; 
+          <span style="color:var(--red); font-weight:600;">-${data.growth.churned} Expired</span>
+          (${netGrowthSign} Net)
+        </div>
+      `;
+    }
+
+    const previewFinancials = document.getElementById('previewFinancials');
+    if (previewFinancials) {
+      previewFinancials.innerHTML = `
+        <div style="font-size:1.1rem; font-weight:700; color:var(--green);">NPR ${data.financials.revenue.toLocaleString()}</div>
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:2px;">
+          <span style="color:#ef4444; font-weight:600;">NPR ${data.financials.outstandingDues.toLocaleString()}</span> Outstanding Dues
+        </div>
+      `;
+    }
+
+    const previewRetention = document.getElementById('previewRetention');
+    if (previewRetention) {
+      previewRetention.innerHTML = `
+        <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary);">${data.retention.totalAttendance.toLocaleString()} Total Check-ins</div>
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:2px;">
+          <span>🌅 Morning: <strong>${data.retention.morningShift}</strong></span> &bull; 
+          <span>☀️ Day: <strong>${data.retention.dayShift}</strong></span>
+        </div>
+      `;
+    }
+
+    // Render Full Document Preview
+    const previewContainer = document.getElementById('reportPreviewContainer');
+    if (previewContainer) {
+      previewContainer.innerHTML = generateProfessionalReportHTML(data);
+    }
+
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to load reports data', 'error');
+  }
+}
+
+document.getElementById('reportStartDate')?.addEventListener('change', loadReportsPage);
+document.getElementById('reportEndDate')?.addEventListener('change', loadReportsPage);
+
+function generateProfessionalReportHTML(d) {
+  let paymentMethodsRows = '';
+  const totalRev = d.financials.revenue || 1;
+  for (const [method, amount] of Object.entries(d.financials.paymentMethods)) {
+    const pct = Math.round((amount / (d.financials.revenue || 1)) * 100);
+    paymentMethodsRows += `
+      <tr>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #475569; font-weight: 500;">${method}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">NPR ${amount.toLocaleString()}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #64748b; font-size: 13px;">${pct}%</td>
+      </tr>
+    `;
+  }
+
+  let plansHTML = '';
+  let totalPlanRevenue = 0;
+  let totalPlanCount = 0;
+  if (d.planSales && d.planSales.length > 0) {
+    for (const plan of d.planSales) {
+      totalPlanRevenue += plan.revenue;
+      totalPlanCount += plan.count;
+    }
+    for (const plan of d.planSales) {
+      const sharePct = totalPlanRevenue > 0 ? Math.round((plan.revenue / totalPlanRevenue) * 100) : 0;
+      plansHTML += `
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-weight: 600; color: #1e293b;">${plan.name}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #475569;">${plan.count}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #059669;">NPR ${plan.revenue.toLocaleString()}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #64748b; font-size: 13px;">${sharePct}%</td>
+        </tr>
+      `;
+    }
+  } else {
+    plansHTML = `<tr><td colspan="4" style="padding: 16px; color: #94a3b8; text-align: center;">No membership packages sold in this date range.</td></tr>`;
+  }
+
+  const morningPct = d.retention.totalAttendance > 0 ? Math.round((d.retention.morningShift / d.retention.totalAttendance) * 100) : 0;
+  const dayPct = d.retention.totalAttendance > 0 ? Math.round((d.retention.dayShift / d.retention.totalAttendance) * 100) : 0;
+  const netGrowth = d.growth.newSignups - d.growth.churned;
+  const netGrowthStr = netGrowth >= 0 ? `+${netGrowth}` : `${netGrowth}`;
+
+  return `
+    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #1e293b; line-height: 1.5; background: #ffffff; padding: 10px;">
+      
+      <!-- Executive Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6366f1; padding-bottom: 18px; margin-bottom: 24px;">
+        <div>
+          <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #6366f1; text-transform: uppercase;">Executive Intelligence Report</div>
+          <h1 style="color: #0f172a; margin: 4px 0 0 0; font-size: 24px; font-weight: 800;">FITNESS HUB GYM</h1>
+          <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">Business Performance & Financial Operations Audit</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; display: inline-block;">
+            <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700;">Audit Duration</div>
+            <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${d.startDate} &rarr; ${d.endDate}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Executive KPI Cards -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: 3px solid #10b981; border-radius: 8px; padding: 14px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Total Revenue</div>
+          <div style="font-size: 20px; font-weight: 800; color: #059669; margin-top: 4px;">NPR ${d.financials.revenue.toLocaleString()}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Collected payments</div>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: 3px solid #6366f1; border-radius: 8px; padding: 14px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Active Members</div>
+          <div style="font-size: 20px; font-weight: 800; color: #4338ca; margin-top: 4px;">${d.growth.totalActive}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Net Change: <strong style="color: ${netGrowth >= 0 ? '#10b981' : '#ef4444'}">${netGrowthStr}</strong></div>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: 3px solid #0ea5e9; border-radius: 8px; padding: 14px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Gym Check-ins</div>
+          <div style="font-size: 20px; font-weight: 800; color: #0369a1; margin-top: 4px;">${d.retention.totalAttendance.toLocaleString()}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Shift utilization</div>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-top: 3px solid #f59e0b; border-radius: 8px; padding: 14px;">
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b;">Pending Dues</div>
+          <div style="font-size: 20px; font-weight: 800; color: #d97706; margin-top: 4px;">NPR ${d.financials.outstandingDues.toLocaleString()}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Uncollected balances</div>
+        </div>
+      </div>
+
+      <!-- Financial & Revenue Breakdown -->
+      <div style="margin-bottom: 28px;">
+        <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0; display: flex; align-items: center; gap: 6px;">
+          <span>💰</span> Financial Inflows & Payment Channels
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <th style="padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Payment Channel</th>
+              <th style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Amount Processed</th>
+              <th style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paymentMethodsRows}
+            <tr style="background: #fafafa; font-weight: 700;">
+              <td style="padding: 10px 12px; color: #0f172a;">Total Realized Revenue</td>
+              <td style="padding: 10px 12px; text-align: right; color: #059669; font-size: 15px;">NPR ${d.financials.revenue.toLocaleString()}</td>
+              <td style="padding: 10px 12px; text-align: right; color: #0f172a;">100%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Plan Performance -->
+      <div style="margin-bottom: 28px;">
+        <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0; display: flex; align-items: center; gap: 6px;">
+          <span>🏆</span> Membership Plans & Sales Distribution
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+          <thead>
+            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <th style="padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Package Tier</th>
+              <th style="padding: 10px 12px; text-align: center; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Units Sold</th>
+              <th style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Invoiced</th>
+              <th style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase;">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${plansHTML}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Member Growth & Attendance Shifts -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px;">
+        <!-- Member Demographics -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #ffffff;">
+          <h3 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">👥 Member Retention & Acquisition</h3>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <span style="color: #64748b;">New Sign-ups Acquired:</span>
+            <strong style="color: #10b981;">+${d.growth.newSignups}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <span style="color: #64748b;">Memberships Expired/Churned:</span>
+            <strong style="color: #ef4444;">-${d.growth.churned}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;">
+            <span style="color: #64748b;">Net Growth in Period:</span>
+            <strong style="color: ${netGrowth >= 0 ? '#10b981' : '#ef4444'};">${netGrowthStr}</strong>
+          </div>
+        </div>
+
+        <!-- Attendance Shifts -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #ffffff;">
+          <h3 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">🏃 Shift Attendance Distribution</h3>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <span style="color: #64748b;">🌅 Morning Shift Check-ins:</span>
+            <strong>${d.retention.morningShift} (${morningPct}%)</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px;">
+            <span style="color: #64748b;">☀️ Day Shift Check-ins:</span>
+            <strong>${d.retention.dayShift} (${dayPct}%)</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px;">
+            <span style="color: #64748b;">Total Facility Utilization:</span>
+            <strong>${d.retention.totalAttendance} Check-ins</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Footer -->
+      <div style="margin-top: 32px; padding: 14px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; font-size: 12px; color: #94a3b8;">
+        <p style="margin: 0;">Official Management Report &bull; Fitness Hub Management System &bull; Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+      </div>
+    </div>
+  `;
+}
+
+// Generate & Email PDF via Outlook
+document.getElementById('generateEmailPdfBtn')?.addEventListener('click', async () => {
+  const emailInput = document.getElementById('reportEmail');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email) {
+    showToast('Please enter a recipient email address', 'error');
+    return;
+  }
+  if (!currentReportData) {
+    showToast('Report data is still loading...', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('generateEmailPdfBtn');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Generating PDF...';
+  }
+
+  showToast('Compiling executive PDF report...', 'success');
+  
+  const htmlReport = generateProfessionalReportHTML(currentReportData);
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlReport;
+  tempDiv.style.padding = '20px';
+  tempDiv.style.position = 'absolute';
+  tempDiv.style.left = '-9999px';
+  tempDiv.style.top = '0';
+  document.body.appendChild(tempDiv);
+  
+  const filename = `Gym_Report_${currentReportData.startDate}_to_${currentReportData.endDate}.pdf`;
+  
+  const opt = {
+    margin:       [0.4, 0.4, 0.4, 0.4],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  try {
+    const pdfBase64 = await html2pdf().set(opt).from(tempDiv).output('datauristring');
+    if (document.body.contains(tempDiv)) {
+      document.body.removeChild(tempDiv);
+    }
+    
+    showToast('Launching Outlook with PDF attached...', 'success');
+    
+    const res = await fetch('/api/reports/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        filename: filename,
+        pdfDataUri: pdfBase64
+      })
+    });
+    
+    const data = await res.json();
+    if (res.ok) {
+      showToast('Outlook draft created with PDF attached!', 'success');
+    } else {
+      showToast(data.error || 'Failed to open Outlook email client', 'error');
+    }
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    showToast('Error compiling PDF document.', 'error');
+    if (document.body.contains(tempDiv)) {
+      document.body.removeChild(tempDiv);
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+});
+
+// Download PDF directly
+document.getElementById('downloadPdfBtn')?.addEventListener('click', async () => {
+  if (!currentReportData) {
+    showToast('Report data is still loading...', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('downloadPdfBtn');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Preparing PDF...';
+  }
+
+  showToast('Generating PDF for download...', 'success');
+
+  const htmlReport = generateProfessionalReportHTML(currentReportData);
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlReport;
+  tempDiv.style.padding = '20px';
+  tempDiv.style.position = 'absolute';
+  tempDiv.style.left = '-9999px';
+  tempDiv.style.top = '0';
+  document.body.appendChild(tempDiv);
+
+  const filename = `Gym_Report_${currentReportData.startDate}_to_${currentReportData.endDate}.pdf`;
+
+  const opt = {
+    margin:       [0.4, 0.4, 0.4, 0.4],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  try {
+    await html2pdf().set(opt).from(tempDiv).save();
+    showToast('PDF downloaded successfully!', 'success');
+  } catch (err) {
+    console.error('PDF download error:', err);
+    showToast('Failed to download PDF.', 'error');
+  } finally {
+    if (document.body.contains(tempDiv)) {
+      document.body.removeChild(tempDiv);
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+});
+

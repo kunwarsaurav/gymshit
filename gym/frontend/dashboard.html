@@ -39,6 +39,9 @@
         <button class="nav-item" data-page="dues" id="nav-dues">
           <span class="nav-icon">💰</span> Outstanding Dues
         </button>
+        <button class="nav-item" data-page="reports" id="nav-reports">
+          <span class="nav-icon">📈</span> Reports
+        </button>
         <button class="nav-item" data-page="settings" id="nav-settings">
           <span class="nav-icon">⚙️</span> Settings
         </button>
@@ -565,6 +568,89 @@
         </div>
       </section>
 
+      <!-- REPORTS & ANALYTICS PAGE -->
+      <section class="page-section" id="page-reports">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px;">
+          <div>
+            <h1>📈 Executive Performance Reports</h1>
+            <p>Generate in-depth gym business intelligence reports, download PDFs, and draft emails</p>
+          </div>
+        </div>
+
+        <!-- Controls & Email Action Bar -->
+        <div class="section-card slide-up" style="margin-bottom:24px; padding:22px;">
+          <div class="section-header" style="margin-bottom:16px;">
+            <h2>⚙️ Report Configuration & Export</h2>
+            <div class="report-presets" style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setReportDateRange('this_month')">This Month</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setReportDateRange('last_30')">Last 30 Days</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setReportDateRange('last_90')">Last 3 Months</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setReportDateRange('this_year')">This Year</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setReportDateRange('all_time')">1 Year Complete</button>
+            </div>
+          </div>
+          
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; align-items:end;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">Start Date</label>
+              <input type="date" class="form-input" id="reportStartDate">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">End Date</label>
+              <input type="date" class="form-input" id="reportEndDate">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size:13px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">Recipient Email</label>
+              <input type="email" class="form-input" id="reportEmail" placeholder="owner@gymhub.com" value="owner@gymhub.com">
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-primary" id="generateEmailPdfBtn" style="flex:1; min-width:180px; height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                <span>📧</span> Generate &amp; Email PDF
+              </button>
+              <button class="btn btn-secondary" id="downloadPdfBtn" style="height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" title="Download PDF directly to computer">
+                <span>📥</span> Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- High-Level KPI Summary -->
+        <div class="stats-grid" style="margin-bottom:24px;">
+          <div class="stat-card purple">
+            <div class="stat-icon">👥</div>
+            <div class="stat-label">Growth &amp; Members</div>
+            <div id="previewGrowth" style="margin-top:8px; line-height:1.6;">
+              <div style="font-size:0.9rem;">Loading...</div>
+            </div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">💰</div>
+            <div class="stat-label">Financial Health</div>
+            <div id="previewFinancials" style="margin-top:8px; line-height:1.6;">
+              <div style="font-size:0.9rem;">Loading...</div>
+            </div>
+          </div>
+          <div class="stat-card teal">
+            <div class="stat-icon">🏃</div>
+            <div class="stat-label">Retention &amp; Check-ins</div>
+            <div id="previewRetention" style="margin-top:8px; line-height:1.6;">
+              <div style="font-size:0.9rem;">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Report Preview Document -->
+        <div class="section-card" style="padding:28px;">
+          <div class="section-header" style="border-bottom: 1px solid var(--border); padding-bottom:16px; margin-bottom:20px;">
+            <h2>📄 Live Document Preview</h2>
+            <span class="badge active" style="font-size:12px;">Executive Ready</span>
+          </div>
+          <div id="reportPreviewContainer" style="background:#ffffff; color:#2d3436; border-radius:10px; padding:24px; box-shadow:0 2px 10px rgba(0,0,0,0.04); border:1px solid #e2e8f0; min-height:300px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
       <!-- SETTINGS PAGE -->
       <section class="page-section" id="page-settings">
         <div class="page-header">
@@ -710,6 +796,62 @@
           </div>
         </div>
       </div>
+      </section>
+
+      <!-- REPORTS PAGE -->
+      <section class="page-section" id="page-reports">
+        <div class="page-header">
+          <h1>Analytics Reports</h1>
+          <p>Generate and send performance reports to the owner</p>
+        </div>
+
+        <div class="section-card">
+          <div class="section-header">
+            <h2>Draft Email Report</h2>
+          </div>
+          
+          <div class="form-row" style="align-items: flex-end;">
+            <div class="form-group" style="flex: 1;">
+              <label>Recipient Email</label>
+              <input type="email" id="reportEmail" class="form-input" placeholder="owner@example.com" required>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label>From Date</label>
+              <input type="date" id="reportStartDate" class="form-input">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label>To Date</label>
+              <input type="date" id="reportEndDate" class="form-input">
+            </div>
+            <div class="form-group" style="flex: 0 0 auto; display: flex; gap: 8px;">
+              <button class="btn btn-primary" id="generateEmailPdfBtn" style="height: 42px;">📄 Generate & Email PDF</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <h3>Preview Data (What will be included)</h3>
+            <div class="stats-grid" style="margin-top: 16px;">
+              <!-- Growth -->
+              <div class="stat-card purple">
+                <div class="stat-icon">👥</div>
+                <div class="stat-value" id="previewGrowth" style="font-size: 1.2rem; margin-top: 8px;">Loading...</div>
+                <div class="stat-label">Growth & Members</div>
+              </div>
+              <!-- Financials -->
+              <div class="stat-card green">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value" id="previewFinancials" style="font-size: 1.2rem; margin-top: 8px;">Loading...</div>
+                <div class="stat-label">Financial Health</div>
+              </div>
+              <!-- Retention -->
+              <div class="stat-card teal">
+                <div class="stat-icon">🏃</div>
+                <div class="stat-value" id="previewRetention" style="font-size: 1.2rem; margin-top: 8px;">Loading...</div>
+                <div class="stat-label">Retention & Attendance</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
     </main>
@@ -1212,7 +1354,8 @@
     </div>
   </div>
 
-  <script src="/js/dashboard.js?v=6"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="/js/dashboard.js?v=7"></script>
 </body>
 
 </html>

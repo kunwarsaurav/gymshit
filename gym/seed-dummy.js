@@ -1,19 +1,36 @@
 const db = require('./src/db/database');
 
-const membersData = [
-  { full_name: 'John Doe', phone: '9812345678', email: 'john@example.com', plan_type: 'Monthly', status: 'active', duration_months: 1, price: 3000 },
-  { full_name: 'Jane Smith', phone: '9823456789', email: 'jane@example.com', plan_type: 'Quarterly', status: 'active', duration_months: 3, price: 8000 },
-  { full_name: 'Alice Johnson', phone: '9834567890', email: 'alice@example.com', plan_type: 'Yearly', status: 'active', duration_months: 12, price: 25000 },
-  { full_name: 'Bob Brown', phone: '9845678901', email: 'bob@example.com', plan_type: 'Monthly', status: 'expired', duration_months: 1, price: 3000 },
-  { full_name: 'Charlie Davis', phone: '9856789012', email: 'charlie@example.com', plan_type: 'Half-Yearly', status: 'active', duration_months: 6, price: 15000 },
-  { full_name: 'Diana Evans', phone: '9867890123', email: 'diana@example.com', plan_type: 'Monthly', status: 'active', duration_months: 1, price: 3000 },
-  { full_name: 'Ethan Fox', phone: '9878901234', email: 'ethan@example.com', plan_type: 'Yearly', status: 'active', duration_months: 12, price: 25000 },
-  { full_name: 'Fiona Green', phone: '9889012345', email: 'fiona@example.com', plan_type: 'Quarterly', status: 'expired', duration_months: 3, price: 8000 },
-  { full_name: 'George Harris', phone: '9890123456', email: 'george@example.com', plan_type: 'Monthly', status: 'active', duration_months: 1, price: 3000 },
-  { full_name: 'Hannah Miller', phone: '9801234567', email: 'hannah@example.com', plan_type: 'Half-Yearly', status: 'active', duration_months: 6, price: 15000 }
+console.log('Clearing existing dummy data...');
+// Clear existing data (optional, but good for a fresh 1-year seed)
+try {
+  db.db.exec("DELETE FROM attendance");
+  db.db.exec("DELETE FROM payments");
+  db.db.exec("DELETE FROM memberships");
+  db.db.exec("DELETE FROM members");
+  // reset sqlite sequence for clean IDs
+  db.db.exec("DELETE FROM sqlite_sequence WHERE name IN ('attendance', 'payments', 'memberships', 'members')");
+} catch (e) {
+  console.log('Error clearing data:', e.message);
+}
+
+// 1. Seed Plans
+console.log('Seeding plans...');
+try {
+  db.db.prepare("INSERT OR IGNORE INTO plans (id, plan_name, duration_value, duration_type, regular_price) VALUES (1, 'Monthly', 1, 'MONTH', 3000)").run();
+  db.db.prepare("INSERT OR IGNORE INTO plans (id, plan_name, duration_value, duration_type, regular_price) VALUES (2, 'Quarterly', 3, 'MONTH', 8000)").run();
+  db.db.prepare("INSERT OR IGNORE INTO plans (id, plan_name, duration_value, duration_type, regular_price) VALUES (3, 'Half-Yearly', 6, 'MONTH', 15000)").run();
+  db.db.prepare("INSERT OR IGNORE INTO plans (id, plan_name, duration_value, duration_type, regular_price) VALUES (4, 'Yearly', 12, 'MONTH', 25000)").run();
+} catch (e) {
+  console.log('Plans already exist or error:', e.message);
+}
+
+const plans = [
+  { id: 1, name: 'Monthly', price: 3000, months: 1 },
+  { id: 2, name: 'Quarterly', price: 8000, months: 3 },
+  { id: 3, name: 'Half-Yearly', price: 15000, months: 6 },
+  { id: 4, name: 'Yearly', price: 25000, months: 12 }
 ];
 
-console.log('Seeding members, memberships, and payments...');
 const insertMember = db.db.prepare(`
   INSERT INTO members (full_name, phone, email, join_date, duration_months, expiry_date, plan_type, status)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -29,105 +46,145 @@ const insertPayment = db.db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
 
-// Insert default plans
-console.log('Seeding plans...');
-try {
-  db.db.prepare("INSERT OR IGNORE INTO plans (plan_name, duration_value, duration_type, regular_price) VALUES ('Monthly', 1, 'MONTH', 3000)").run();
-  db.db.prepare("INSERT OR IGNORE INTO plans (plan_name, duration_value, duration_type, regular_price) VALUES ('Quarterly', 3, 'MONTH', 8000)").run();
-  db.db.prepare("INSERT OR IGNORE INTO plans (plan_name, duration_value, duration_type, regular_price) VALUES ('Half-Yearly', 6, 'MONTH', 15000)").run();
-  db.db.prepare("INSERT OR IGNORE INTO plans (plan_name, duration_value, duration_type, regular_price) VALUES ('Yearly', 12, 'MONTH', 25000)").run();
-} catch (e) {
-  console.log('Plans already exist or error:', e.message);
-}
-
-const memberIds = [];
-const today = new Date();
-
-let receiptCounter = 1000;
-
-for (const m of membersData) {
-  const joinDate = new Date(today);
-  
-  if (m.status === 'expired') {
-    joinDate.setMonth(today.getMonth() - m.duration_months - 1);
-  } else {
-    joinDate.setDate(today.getDate() - Math.floor(Math.random() * 20)); // random join date in last 20 days
-  }
-
-  const expiryDate = new Date(joinDate);
-  expiryDate.setMonth(joinDate.getMonth() + m.duration_months);
-
-  const joinDateStr = joinDate.toISOString().split('T')[0];
-  const expiryDateStr = expiryDate.toISOString().split('T')[0];
-
-  const info = insertMember.run(m.full_name, m.phone, m.email, joinDateStr, m.duration_months, expiryDateStr, m.plan_type, m.status);
-  const memberId = info.lastInsertRowid;
-  memberIds.push(memberId);
-  
-  // Membership
-  let planId = 1;
-  if (m.plan_type === 'Quarterly') planId = 2;
-  else if (m.plan_type === 'Half-Yearly') planId = 3;
-  else if (m.plan_type === 'Yearly') planId = 4;
-  
-  const paymentStatus = (Math.random() > 0.3) ? 'PAID' : 'UNPAID';
-  
-  const msInfo = insertMembership.run(
-    memberId, planId, m.plan_type, joinDateStr, expiryDateStr, 
-    m.price, m.price, joinDateStr, 
-    m.status === 'expired' ? 'EXPIRED' : 'ACTIVE', 
-    paymentStatus
-  );
-  
-  const membershipId = msInfo.lastInsertRowid;
-  
-  // Payment
-  if (paymentStatus === 'PAID') {
-    const paymentDateStr = joinDateStr + ' 10:00:00';
-    insertPayment.run(memberId, membershipId, m.price, 'Cash', paymentDateStr, 'RCPT-' + (receiptCounter++), 'COMPLETED');
-  }
-}
-
-console.log('Seeding attendance...');
 const insertAttendance = db.db.prepare(`
   INSERT INTO attendance (member_id, check_in_time, date, shift)
   VALUES (?, ?, ?, ?)
 `);
 
-// Generate attendance for last 7 days
-for (let i = 0; i < 7; i++) {
-  const date = new Date(today);
-  date.setDate(today.getDate() - i);
-  const dateStr = date.toISOString().split('T')[0];
+const firstNames = ['John', 'Jane', 'Alice', 'Bob', 'Charlie', 'Diana', 'Ethan', 'Fiona', 'George', 'Hannah', 'Ian', 'Julia', 'Kevin', 'Lily', 'Mason', 'Nora', 'Oliver', 'Penny', 'Quinn', 'Rachel', 'Sam', 'Tina', 'Ursula', 'Victor', 'Wendy', 'Xander', 'Yvonne', 'Zack', 'Ram', 'Sita', 'Hari', 'Gita', 'Shyam', 'Radha', 'Kiran', 'Pooja', 'Ravi', 'Sunita', 'Amit', 'Anju', 'Nitin', 'Nisha', 'Rahul', 'Riya', 'Vikram', 'Vandana', 'Deepak', 'Divya', 'Suresh', 'Sushma'];
+const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Thapa', 'Karki', 'Magar', 'Gurung', 'Tamang', 'Rai', 'Limbu', 'Shrestha', 'Maharjan', 'Sherpa', 'Lama', 'Yadav', 'Chaudhary', 'Giri', 'Puri', 'Joshi', 'Bhattarai', 'Adhikari', 'Nepal', 'Poudel', 'Dahal', 'Bista'];
+const paymentMethods = ['Cash', 'QR', 'Card', 'Bank Transfer'];
 
-  // Pick random members to attend
-  const attendingMembers = memberIds.filter(() => Math.random() > 0.3); // 70% chance to attend
+function randomDate(start, end) {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+}
+
+function formatDateStr(d) {
+  const pad = (n) => n.toString().padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+function formatDateTimeStr(d) {
+  const pad = (n) => n.toString().padStart(2, '0');
+  return formatDateStr(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+const today = new Date();
+const oneYearAgo = new Date();
+oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+console.log('Generating 50+ members over 1 year...');
+
+let receiptCounter = 10000;
+const memberIds = [];
+
+for (let i = 0; i < 60; i++) {
+  const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+  const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+  const fullName = firstName + ' ' + lastName;
+  const phone = '98' + Math.floor(10000000 + Math.random() * 90000000);
+  const email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@example.com';
   
-  for (const memberId of attendingMembers) {
-    const shift = Math.random() > 0.5 ? 'morning' : 'day';
-    let hour, minute;
-    if (shift === 'morning') {
-      hour = 6 + Math.floor(Math.random() * 4); // 6 AM to 9 AM
-    } else {
-      hour = 16 + Math.floor(Math.random() * 4); // 4 PM to 7 PM
+  // Pick a join date sometime in the last year
+  const joinDate = randomDate(oneYearAgo, today);
+  
+  // They will have a history of memberships starting from joinDate
+  let currentStart = new Date(joinDate);
+  let status = 'active';
+  let memberId = null;
+  let finalExpiry = new Date(currentStart);
+  let lastPlan = plans[0];
+  
+  // Generate memberships loop until we reach 'today' or they churn
+  let isFirst = true;
+  while (currentStart <= today) {
+    const plan = plans[Math.floor(Math.random() * plans.length)];
+    lastPlan = plan;
+    
+    let currentEnd = new Date(currentStart);
+    currentEnd.setMonth(currentStart.getMonth() + plan.months);
+    finalExpiry = new Date(currentEnd);
+    
+    if (isFirst) {
+      // Create member record first time
+      const mInfo = insertMember.run(fullName, phone, email, formatDateStr(joinDate), plan.months, formatDateStr(currentEnd), plan.name, 'active');
+      memberId = mInfo.lastInsertRowid;
+      memberIds.push(memberId);
+      isFirst = false;
     }
-    minute = Math.floor(Math.random() * 60);
     
-    const checkInTime = new Date(date);
-    checkInTime.setHours(hour, minute, 0, 0);
+    // Membership Status
+    let msStatus = 'EXPIRED';
+    if (currentEnd > today) msStatus = 'ACTIVE';
     
-    const pad = (n) => n.toString().padStart(2, '0');
-    const checkInTimeStr = checkInTime.getFullYear() + '-' + pad(checkInTime.getMonth() + 1) + '-' + pad(checkInTime.getDate()) + ' ' + pad(checkInTime.getHours()) + ':' + pad(checkInTime.getMinutes()) + ':' + pad(checkInTime.getSeconds());
+    // Payment Status
+    const isPaid = Math.random() > 0.1; // 90% chance to pay
+    const payStatus = isPaid ? 'PAID' : 'UNPAID';
+    
+    const msInfo = insertMembership.run(
+      memberId, plan.id, plan.name, 
+      formatDateStr(currentStart), formatDateStr(currentEnd), 
+      plan.price, plan.price, formatDateStr(currentStart), 
+      msStatus, payStatus
+    );
+    
+    // Payment
+    if (isPaid) {
+      const pm = paymentMethods[Math.floor(Math.random() * paymentMethods.length)];
+      const pDate = new Date(currentStart);
+      pDate.setHours(10 + Math.floor(Math.random() * 6));
+      insertPayment.run(memberId, msInfo.lastInsertRowid, plan.price, pm, formatDateTimeStr(pDate), 'RCPT-' + (receiptCounter++), 'COMPLETED');
+    }
+    
+    // Random chance to churn (30% chance they don't renew if it's past expiry)
+    if (currentEnd < today && Math.random() < 0.3) {
+      status = 'expired';
+      break; 
+    }
+    
+    // Advance to next term (maybe they renewed exactly on end date, or a few days late)
+    currentStart = new Date(currentEnd);
+    currentStart.setDate(currentStart.getDate() + Math.floor(Math.random() * 5));
+  }
+  
+  // Update member final status and expiry
+  if (finalExpiry < today) status = 'expired';
+  db.db.prepare('UPDATE members SET expiry_date = ?, status = ?, duration_months = ?, plan_type = ? WHERE id = ?').run(
+    formatDateStr(finalExpiry), status, lastPlan.months, lastPlan.name, memberId
+  );
+}
 
-    insertAttendance.run(memberId, checkInTimeStr, dateStr, shift);
+console.log('Generating 1 year of attendance logs...');
+// Generate attendance for the last 365 days
+for (let d = new Date(oneYearAgo); d <= today; d.setDate(d.getDate() + 1)) {
+  const dateStr = formatDateStr(d);
+  
+  // Pick 5 to 15 random members to attend this day
+  const attendersCount = 5 + Math.floor(Math.random() * 11);
+  const shuffled = [...memberIds].sort(() => 0.5 - Math.random());
+  const todaysAttenders = shuffled.slice(0, attendersCount);
+  
+  for (const memberId of todaysAttenders) {
+    const shift = Math.random() > 0.4 ? 'morning' : 'day';
+    let hour = shift === 'morning' ? 6 + Math.floor(Math.random() * 4) : 16 + Math.floor(Math.random() * 4);
+    let min = Math.floor(Math.random() * 60);
+    
+    const checkIn = new Date(d);
+    checkIn.setHours(hour, min, 0, 0);
+    
+    // Only insert if member actually joined before this date
+    const member = db.db.prepare("SELECT join_date FROM members WHERE id = ?").get(memberId);
+    if (new Date(member.join_date) <= d) {
+      insertAttendance.run(memberId, formatDateTimeStr(checkIn), dateStr, shift);
+    }
   }
 }
 
-console.log('Updating statuses...');
+console.log('Updating statuses internally...');
 try {
   db.updateMembershipStatuses();
 } catch (e) {
-  console.log('Status update error ignored:', e.message);
+  // ignore
 }
 
-console.log('✅ Dummy data seeded successfully!');
+console.log('✅ Realistic 1-Year Data Seeded Successfully!');
