@@ -1979,10 +1979,10 @@ function renderPlansSettingsTable() {
       <td style="color: var(--text-muted); font-size: 12px;">
         ${escapeHtml(p.description || 'Standard gym access')}
       </td>
-      <td style="text-align: center;">
-        <div class="actions-cell" style="justify-content: center;">
-          <button class="action-btn" onclick="openEditPlanModal(${p.id})" title="Edit Plan Rate">✏️</button>
-          <button class="action-btn delete" onclick="deleteGymPlan(${p.id}, '${escapeHtml(p.plan_name)}')" title="Delete Plan">🗑️</button>
+      <td style="text-align: center; white-space: nowrap;">
+        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+          <button class="action-btn" onclick="openEditPlanModal(${p.id})" title="Edit Plan Rate" style="width: 34px; height: 34px; font-size: 13px;">✏️</button>
+          <button class="action-btn delete" onclick="deleteGymPlan(${p.id}, '${escapeHtml(p.plan_name)}')" title="Delete Plan" style="width: 34px; height: 34px; font-size: 13px;">🗑️</button>
         </div>
       </td>
     </tr>

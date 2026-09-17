@@ -2935,3 +2935,27 @@ textarea.form-input {
   }
 }
 
+/* ─── PLANS & RATES SETTINGS TABLE ─── */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.plans-settings-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+.plans-settings-table th,
+.plans-settings-table td {
+  padding: 14px 18px !important;
+}
+
+.plans-settings-table th:last-child,
+.plans-settings-table td:last-child {
+  text-align: center;
+  white-space: nowrap;
+}
+
+
