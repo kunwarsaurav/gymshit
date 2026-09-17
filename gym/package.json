@@ -5,7 +5,7 @@
   "main": "electron.js",
   "scripts": {
     "start": "node --experimental-sqlite server.js",
-    "dev": "node --experimental-sqlite server.js",
+    "dev": "node --watch --experimental-sqlite server.js",
     "reset": "node --experimental-sqlite reset-db.js",
     "app": "electron . > debug.log 2>&1",
     "build": "electron-builder --win"
@@ -29,6 +29,7 @@
     "express": "^4.21.1",
     "express-session": "^1.18.1",
     "node-cron": "^3.0.3",
+    "nodemailer": "^10.0.10",
     "twilio": "^5.4.0"
   },
   "devDependencies": {

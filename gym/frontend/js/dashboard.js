@@ -66,6 +66,7 @@ function navigateTo(page) {
   if (page === 'logistics') loadLogistics();
   if (page === 'dues') loadDuesPage();
   if (page === 'reports') loadReportsPage();
+  if (page === 'settings') loadSettingsPage();
 }
 
 navItems.forEach(item => {
@@ -83,9 +84,143 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
   window.location.href = '/';
 });
 
+// ─── Reusable Pagination Navigation Builder ────
+function getPageNumbers(currentPage, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, '...', totalPages];
+  }
+  if (currentPage >= totalPages - 3) {
+    return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+}
+
+function buildPaginationNav({ currentPage, totalPages, onPageChange, showFirstLast = true }) {
+  const frag = document.createDocumentFragment();
+  if (totalPages <= 1) return frag;
+
+  const makeBtn = (text, page, disabled, isActive = false, title = '') => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `pagination-btn ${isActive ? 'active' : ''}`;
+    btn.innerHTML = text;
+    if (title) btn.title = title;
+    if (disabled) {
+      btn.disabled = true;
+    } else {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        onPageChange(page);
+      });
+    }
+    return btn;
+  };
+
+  // First page
+  if (showFirstLast) {
+    frag.appendChild(makeBtn('«', 1, currentPage === 1, false, 'First Page'));
+  }
+
+  // Prev
+  frag.appendChild(makeBtn('‹', currentPage - 1, currentPage === 1, false, 'Previous Page'));
+
+  // Page Numbers & Ellipses
+  const pages = getPageNumbers(currentPage, totalPages);
+  pages.forEach(p => {
+    if (p === '...') {
+      const span = document.createElement('span');
+      span.className = 'pagination-ellipsis';
+      span.textContent = '…';
+      frag.appendChild(span);
+    } else {
+      frag.appendChild(makeBtn(p, p, false, p === currentPage, `Page ${p}`));
+    }
+  });
+
+  // Next
+  frag.appendChild(makeBtn('›', currentPage + 1, currentPage === totalPages, false, 'Next Page'));
+
+  // Last page
+  if (showFirstLast) {
+    frag.appendChild(makeBtn('»', totalPages, currentPage === totalPages, false, 'Last Page'));
+  }
+
+  return frag;
+}
+
 // ═══════════════════════════════════════════════
 // DASHBOARD / OVERVIEW
 // ═══════════════════════════════════════════════
+
+let allExpiringMembers = [];
+let expiringCurrentPage = 1;
+const expiringPageSize = 5;
+
+function renderExpiringList() {
+  const container = document.getElementById('expiringList');
+  const footer = document.getElementById('expiringPaginationFooter');
+  const badge = document.getElementById('expiringBadge');
+
+  if (badge) {
+    if (allExpiringMembers.length > 0) {
+      badge.textContent = `${allExpiringMembers.length} Expiring Soon`;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (allExpiringMembers.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><h3>All good!</h3><p>No memberships expiring within 7 days</p></div>`;
+    if (footer) footer.style.display = 'none';
+    return;
+  }
+
+  const totalPages = Math.ceil(allExpiringMembers.length / expiringPageSize) || 1;
+  expiringCurrentPage = Math.min(Math.max(1, expiringCurrentPage), totalPages);
+
+  const startIdx = (expiringCurrentPage - 1) * expiringPageSize;
+  const endIdx = Math.min(startIdx + expiringPageSize, allExpiringMembers.length);
+  const pagedList = allExpiringMembers.slice(startIdx, endIdx);
+
+  container.innerHTML = pagedList.map(m => `
+    <div class="notif-item">
+      <div class="notif-icon warning">⏰</div>
+      <div class="notif-content">
+        <div class="name">${escapeHtml(m.full_name)}</div>
+        <div class="message">Membership expires on ${formatDate(m.expiry_date)} (${m.days_remaining} day${m.days_remaining !== 1 ? 's' : ''} remaining)</div>
+        <div class="time">📱 ${m.phone}</div>
+      </div>
+      <button class="btn btn-success btn-sm" onclick="sendNotification(${m.id}, 'expiry_warning')">📨 Notify</button>
+    </div>
+  `).join('');
+
+  if (footer) {
+    if (allExpiringMembers.length > expiringPageSize) {
+      footer.style.display = 'flex';
+      document.getElementById('expiringPageStart').textContent = startIdx + 1;
+      document.getElementById('expiringPageEnd').textContent = endIdx;
+      document.getElementById('expiringTotalCount').textContent = allExpiringMembers.length;
+
+      const navContainer = document.getElementById('expiringPaginationNav');
+      navContainer.innerHTML = '';
+      navContainer.appendChild(buildPaginationNav({
+        currentPage: expiringCurrentPage,
+        totalPages: totalPages,
+        onPageChange: (newPage) => {
+          expiringCurrentPage = newPage;
+          renderExpiringList();
+        },
+        showFirstLast: false
+      }));
+    } else {
+      footer.style.display = 'none';
+    }
+  }
+}
 
 async function loadDashboard() {
   try {
@@ -100,25 +235,10 @@ async function loadDashboard() {
     // Load expiring soon list
     const expRes = await fetch('/api/members?status=active');
     const members = await expRes.json();
-    const expiring = members.filter(m => m.days_remaining >= 0 && m.days_remaining <= 7);
-    const container = document.getElementById('expiringList');
-
-    if (expiring.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><h3>All good!</h3><p>No memberships expiring within 7 days</p></div>`;
-      return;
-    }
-
-    container.innerHTML = expiring.map(m => `
-      <div class="notif-item">
-        <div class="notif-icon warning">⏰</div>
-        <div class="notif-content">
-          <div class="name">${escapeHtml(m.full_name)}</div>
-          <div class="message">Membership expires on ${formatDate(m.expiry_date)} (${m.days_remaining} day${m.days_remaining !== 1 ? 's' : ''} remaining)</div>
-          <div class="time">📱 ${m.phone}</div>
-        </div>
-        <button class="btn btn-success btn-sm" onclick="sendNotification(${m.id}, 'expiry_warning')">📨 Notify</button>
-      </div>
-    `).join('');
+    allExpiringMembers = members.filter(m => m.days_remaining >= 0 && m.days_remaining <= 7)
+      .sort((a, b) => (a.days_remaining || 0) - (b.days_remaining || 0));
+    expiringCurrentPage = 1;
+    renderExpiringList();
   } catch (err) {
     showToast('Failed to load dashboard', 'error');
   }
@@ -128,20 +248,33 @@ async function loadDashboard() {
 // MEMBERS CRUD
 // ═══════════════════════════════════════════════
 
+let allMembersList = [];
+let membersCurrentPage = 1;
+let membersPageSize = 10;
+
 let searchTimeout;
 document.getElementById('searchInput').addEventListener('input', (e) => {
   clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => loadMembers(), 300);
+  searchTimeout = setTimeout(() => loadMembers(true), 300);
 });
-document.getElementById('statusFilter').addEventListener('change', () => loadMembers());
+document.getElementById('statusFilter').addEventListener('change', () => loadMembers(true));
 
-async function loadMembers() {
+document.getElementById('membersPageSizeSelect')?.addEventListener('change', (e) => {
+  membersPageSize = parseInt(e.target.value, 10) || 10;
+  membersCurrentPage = 1;
+  renderMembersTable();
+});
+
+async function loadMembers(resetPage = false) {
+  if (resetPage) {
+    membersCurrentPage = 1;
+  }
   const search = document.getElementById('searchInput').value;
   const status = document.getElementById('statusFilter').value;
   try {
     const res = await fetch(`/api/members?search=${encodeURIComponent(search)}&status=${status}`);
-    const members = await res.json();
-    renderMembers(members);
+    allMembersList = await res.json();
+    renderMembersTable();
   } catch { showToast('Failed to load members', 'error'); }
 }
 
@@ -154,21 +287,30 @@ function getInitials(name) {
   return parts[0][0].toUpperCase();
 }
 
-function renderMembers(members) {
+function renderMembersTable() {
   const tbody = document.getElementById('membersBody');
   const empty = document.getElementById('emptyState');
+  const container = document.getElementById('membersTableContainer');
+  const footer = document.getElementById('membersPaginationFooter');
 
-  if (members.length === 0) {
+  if (!allMembersList || allMembersList.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
-    document.querySelector('#membersTableContainer').style.display = 'none';
+    container.style.display = 'none';
     return;
   }
 
   empty.style.display = 'none';
-  document.querySelector('#membersTableContainer').style.display = 'block';
+  container.style.display = 'block';
 
-  tbody.innerHTML = members.map(m => {
+  const totalPages = Math.ceil(allMembersList.length / membersPageSize) || 1;
+  membersCurrentPage = Math.min(Math.max(1, membersCurrentPage), totalPages);
+
+  const startIdx = (membersCurrentPage - 1) * membersPageSize;
+  const endIdx = Math.min(startIdx + membersPageSize, allMembersList.length);
+  const pagedMembers = allMembersList.slice(startIdx, endIdx);
+
+  tbody.innerHTML = pagedMembers.map(m => {
     let statusClass = m.status;
     if (m.status === 'active' && m.days_remaining <= 7) statusClass = 'expiring';
     const statusLabel = statusClass === 'expiring' ? 'Expiring' : m.status;
@@ -220,6 +362,36 @@ function renderMembers(members) {
       </td>
     </tr>`;
   }).join('');
+
+  if (footer) {
+    document.getElementById('membersPageStart').textContent = startIdx + 1;
+    document.getElementById('membersPageEnd').textContent = endIdx;
+    document.getElementById('membersTotalCount').textContent = allMembersList.length;
+
+    const navContainer = document.getElementById('membersPaginationNav');
+    navContainer.innerHTML = '';
+    navContainer.appendChild(buildPaginationNav({
+      currentPage: membersCurrentPage,
+      totalPages: totalPages,
+      onPageChange: (newPage) => {
+        membersCurrentPage = newPage;
+        renderMembersTable();
+        const tableCard = container.closest('.section-card');
+        if (tableCard) {
+          const rect = tableCard.getBoundingClientRect();
+          if (rect.top < 0) {
+            tableCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      },
+      showFirstLast: true
+    }));
+  }
+}
+
+function renderMembers(members) {
+  allMembersList = members || [];
+  renderMembersTable();
 }
 
 // ─── Add/Edit Modal ───────────────────────────
@@ -2904,4 +3076,217 @@ document.getElementById('downloadPdfBtn')?.addEventListener('click', async () =>
     }
   }
 });
+
+// Send PDF Directly via SMTP (1-Click Background Dispatch)
+document.getElementById('sendDirectEmailBtn')?.addEventListener('click', async () => {
+  const emailInput = document.getElementById('reportEmail');
+  const email = emailInput ? emailInput.value.trim() : '';
+  if (!email) {
+    showToast('Please enter a recipient email address', 'error');
+    return;
+  }
+  if (!currentReportData) {
+    showToast('Report data is still loading...', 'error');
+    return;
+  }
+
+  const previewEl = document.getElementById('reportPreviewContainer');
+  if (!previewEl) {
+    showToast('Report preview not ready', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('sendDirectEmailBtn');
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Sending PDF...';
+  }
+
+  showToast('Compiling & delivering PDF report directly to ' + email + '...', 'success');
+
+  const filename = `Gym_Report_${currentReportData.startDate}_to_${currentReportData.endDate}.pdf`;
+
+  const opt = {
+    margin:       [8, 8, 8, 8],
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  try {
+    const pdfBase64 = await html2pdf().set(opt).from(previewEl).outputPdf('datauristring');
+
+    const res = await fetch('/api/reports/send-direct-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        filename: filename,
+        pdfDataUri: pdfBase64
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(`🎉 PDF report directly emailed to ${email}!`, 'success');
+    } else {
+      if (data.error === 'SMTP_NOT_CONFIGURED') {
+        showToast('⚠️ Email delivery is not configured yet. Please enter your email in Settings.', 'error');
+        setTimeout(() => {
+          navigateTo('settings');
+          document.getElementById('smtpUser')?.focus();
+        }, 1500);
+      } else {
+        showToast(data.message || 'Failed to send email. Check SMTP settings.', 'error');
+      }
+    }
+  } catch (err) {
+    console.error('Direct email dispatch error:', err);
+    showToast('Error generating or sending PDF report.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════
+// SETTINGS PAGE & SMTP CONFIGURATION
+// ═══════════════════════════════════════════════
+async function loadSettingsPage() {
+  try {
+    const res = await fetch('/api/reports/smtp-config');
+    if (!res.ok) return;
+    const config = await res.json();
+
+    const serviceSelect = document.getElementById('smtpService');
+    const senderNameInput = document.getElementById('smtpSenderName');
+    const userInput = document.getElementById('smtpUser');
+    const passInput = document.getElementById('smtpPass');
+    const hostInput = document.getElementById('smtpHost');
+    const portInput = document.getElementById('smtpPort');
+    const statusBadge = document.getElementById('smtpStatusBadge');
+    const customFields = document.getElementById('customSmtpFields');
+
+    if (serviceSelect) serviceSelect.value = config.service || 'gmail';
+    if (senderNameInput) senderNameInput.value = config.senderName || 'Fitness Hub Management';
+    if (userInput) userInput.value = config.user || '';
+    if (passInput) passInput.placeholder = config.hasPassword ? '•••••••••••••••• (Saved)' : 'Enter 16-character App Password';
+    if (hostInput) hostInput.value = config.host || 'smtp.gmail.com';
+    if (portInput) portInput.value = config.port || '587';
+
+    if (customFields) {
+      customFields.style.display = config.service === 'custom' ? 'flex' : 'none';
+    }
+
+    if (statusBadge) {
+      if (config.isConfigured) {
+        statusBadge.textContent = '✅ Connected & Configured';
+        statusBadge.style.background = '#dcfce7';
+        statusBadge.style.color = '#15803d';
+      } else {
+        statusBadge.textContent = '⚠️ Not Configured';
+        statusBadge.style.background = '#fef3c7';
+        statusBadge.style.color = '#b45309';
+      }
+    }
+  } catch (err) {
+    console.error('Error loading settings:', err);
+  }
+}
+
+// Toggle custom SMTP fields
+document.getElementById('smtpService')?.addEventListener('change', (e) => {
+  const customFields = document.getElementById('customSmtpFields');
+  const hostInput = document.getElementById('smtpHost');
+  const portInput = document.getElementById('smtpPort');
+
+  if (e.target.value === 'custom') {
+    if (customFields) customFields.style.display = 'flex';
+  } else {
+    if (customFields) customFields.style.display = 'none';
+    if (e.target.value === 'gmail') {
+      if (hostInput) hostInput.value = 'smtp.gmail.com';
+      if (portInput) portInput.value = '587';
+    } else if (e.target.value === 'outlook') {
+      if (hostInput) hostInput.value = 'smtp-mail.outlook.com';
+      if (portInput) portInput.value = '587';
+    }
+  }
+});
+
+// Save SMTP Config Form
+document.getElementById('smtpConfigForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const service = document.getElementById('smtpService').value;
+  const senderName = document.getElementById('smtpSenderName').value;
+  const user = document.getElementById('smtpUser').value;
+  const pass = document.getElementById('smtpPass').value;
+  const host = document.getElementById('smtpHost').value;
+  const port = document.getElementById('smtpPort').value;
+
+  try {
+    const res = await fetch('/api/reports/smtp-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service, senderName, user, pass, host, port })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || 'Email delivery settings saved!', 'success');
+      loadSettingsPage();
+    } else {
+      showToast(data.error || 'Failed to save settings', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to connect to server', 'error');
+  }
+});
+
+// Test SMTP Connection
+document.getElementById('testSmtpBtn')?.addEventListener('click', async () => {
+  const user = document.getElementById('smtpUser').value.trim();
+  if (!user) {
+    showToast('Please enter your sender email address first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('testSmtpBtn');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Testing...';
+  }
+
+  showToast('Sending test email...', 'success');
+
+  try {
+    const res = await fetch('/api/reports/test-smtp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testEmail: user })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message, 'success');
+      loadSettingsPage();
+    } else {
+      showToast(data.message || data.error || 'SMTP Test failed', 'error');
+    }
+  } catch (err) {
+    showToast('Failed to connect to server', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  }
+});
+
 

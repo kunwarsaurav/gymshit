@@ -105,8 +105,15 @@
         <div class="section-card slide-up">
           <div class="section-header">
             <h2>⏰ Expiring Soon</h2>
+            <span class="badge warning" id="expiringBadge" style="display:none;">0 Expiring</span>
           </div>
           <div id="expiringList"></div>
+          <div class="table-pagination-footer compact" id="expiringPaginationFooter" style="display:none;">
+            <div class="pagination-info">
+              <span>Showing <strong id="expiringPageStart">0</strong>–<strong id="expiringPageEnd">0</strong> of <strong id="expiringTotalCount">0</strong> expiring</span>
+            </div>
+            <div class="pagination-nav" id="expiringPaginationNav"></div>
+          </div>
         </div>
       </section>
 
@@ -156,6 +163,22 @@
               </thead>
               <tbody id="membersBody"></tbody>
             </table>
+
+            <div class="table-pagination-footer" id="membersPaginationFooter">
+              <div class="pagination-info">
+                <span>Showing <strong id="membersPageStart">1</strong>–<strong id="membersPageEnd">10</strong> of <strong id="membersTotalCount">0</strong> members</span>
+                <div class="page-size-selector">
+                  <label for="membersPageSizeSelect">Rows per page:</label>
+                  <select id="membersPageSizeSelect" class="filter-select select-sm">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pagination-nav" id="membersPaginationNav"></div>
+            </div>
           </div>
 
           <div class="empty-state" id="emptyState" style="display:none;">
@@ -604,11 +627,14 @@
               <input type="email" class="form-input" id="reportEmail" placeholder="owner@gymhub.com" value="owner@gymhub.com">
             </div>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="btn btn-primary" id="generateEmailPdfBtn" style="flex:1; min-width:180px; height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
-                <span>📧</span> Generate &amp; Email PDF
+              <button class="btn btn-primary" id="sendDirectEmailBtn" style="flex:1; min-width:180px; height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                <span>🚀</span> Send PDF Directly (Email)
               </button>
               <button class="btn btn-secondary" id="downloadPdfBtn" style="height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" title="Download PDF directly to computer">
                 <span>📥</span> Download PDF
+              </button>
+              <button class="btn btn-outline" id="generateEmailPdfBtn" style="height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;" title="Open draft in Outlook app">
+                <span>✉️</span> Open in Outlook
               </button>
             </div>
           </div>
@@ -658,6 +684,60 @@
           <p>Manage your account</p>
         </div>
         <div class="settings-grid">
+          <!-- EMAIL / SMTP CONFIGURATION -->
+          <div class="settings-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="margin:0;">📧 Email Delivery (SMTP) Configuration</h3>
+              <span class="badge" id="smtpStatusBadge" style="font-size:11px; background:#f1f5f9; color:#64748b;">Not Configured</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+              Configure your sender email (Gmail, Outlook, or Custom SMTP) to automatically deliver PDF reports directly to owners and accountants.
+            </p>
+            <form id="smtpConfigForm" style="margin-bottom: 16px;">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Email Service Provider</label>
+                  <select class="form-input" id="smtpService">
+                    <option value="gmail">Gmail (Recommended with App Password)</option>
+                    <option value="outlook">Outlook / Hotmail / Office365</option>
+                    <option value="custom">Custom SMTP Server</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Sender Display Name</label>
+                  <input type="text" class="form-input" id="smtpSenderName" placeholder="Fitness Hub Management" value="Fitness Hub Management">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Sender Email Address *</label>
+                  <input type="email" class="form-input" id="smtpUser" required placeholder="e.g. yourgym@gmail.com">
+                </div>
+                <div class="form-group">
+                  <label>App Password / Password *</label>
+                  <input type="password" class="form-input" id="smtpPass" placeholder="Enter 16-character App Password">
+                  <small style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">
+                    For Gmail: Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--primary);">Google App Passwords</a>.
+                  </small>
+                </div>
+              </div>
+              <div class="form-row" id="customSmtpFields" style="display:none;">
+                <div class="form-group">
+                  <label>SMTP Host</label>
+                  <input type="text" class="form-input" id="smtpHost" placeholder="smtp.example.com">
+                </div>
+                <div class="form-group">
+                  <label>SMTP Port</label>
+                  <input type="number" class="form-input" id="smtpPort" placeholder="587" value="587">
+                </div>
+              </div>
+              <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Save Email Settings</button>
+                <button type="button" class="btn btn-secondary" id="testSmtpBtn" style="width:auto;">🧪 Test Email Connection</button>
+              </div>
+            </form>
+          </div>
+
           <div class="settings-card">
             <h3>🎁 Manage Offer Packages</h3>
           <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">

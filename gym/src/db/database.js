@@ -644,7 +644,15 @@ function setSetting(key, value) {
   db.prepare(`
     INSERT INTO settings (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(key, value);
+  `).run(key, String(value));
+}
+
+function getAllSettings() {
+  const rows = db.prepare('SELECT key, value FROM settings').all();
+  return rows.reduce((acc, r) => {
+    acc[r.key] = r.value;
+    return acc;
+  }, {});
 }
 
 // ─── Attendance Queries ─────────────────────────────────────
@@ -1372,6 +1380,7 @@ module.exports = {
   hasRecentNotification,
   getSetting,
   setSetting,
+  getAllSettings,
   recordAttendance,
   deleteAttendance,
   getAttendanceByDate,
