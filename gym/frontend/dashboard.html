@@ -739,50 +739,75 @@
           </div>
 
           <div class="settings-card">
-            <h3>🎁 Manage Offer Packages</h3>
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-            Create custom membership packages (like "Dashain Offer") that will appear in the onboarding plan selection list.
-          </p>
-          <form id="createPackageForm" style="margin-bottom: 24px;">
-            <div class="form-row">
-              <div class="form-group">
-                <label>Package Name *</label>
-                <input type="text" class="form-input" id="pkgName" required placeholder="e.g. Dashain Offer">
-              </div>
-              <div class="form-group">
-                <label>Duration (Months) *</label>
-                <input type="number" class="form-input" id="pkgDuration" required min="1" max="100" placeholder="e.g. 3">
-              </div>
-              <div class="form-group">
-                <label>Price (Rs.) *</label>
-                <input type="number" class="form-input" id="pkgPrice" required min="0" placeholder="e.g. 2000">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px;">💳 Membership Plans &amp; Rates Management</h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Configure your gym's custom membership rates (Monthly, Quarterly, Yearly, Special Offers) and default new member admission fee.
+                </p>
               </div>
             </div>
-                                <button type="submit" class="btn btn-primary" style="width: auto;"> Add Package</button>
-          </form>
-          
-          <div class="packages-list-container">
-            <h4>Active Custom Packages</h4>
-            <div class="table-container" style="margin-top: 10px; box-shadow: none; border: 1px solid var(--glass-border);">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Package Name</th>
-                    <th>Duration</th>
-                    <th>Price</th>
-                    <th style="width: 80px; text-align: center;">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="packagesListBody">
-                  <!-- Custom packages list will load here dynamically -->
-                </tbody>
-              </table>
-              <div id="emptyPackagesState" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
-                No custom packages created yet. Add one above!
+
+            <!-- Admission Fee Setting -->
+            <div style="background: var(--bg-primary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 18px; margin-bottom: 24px;">
+              <form id="admissionFeeForm" style="display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;">
+                <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 240px;">
+                  <label style="font-weight: 700; color: var(--text-primary); font-size: 13px;">Default New Member Admission / Registration Fee (NPR)</label>
+                  <input type="number" class="form-input" id="settingAdmissionFee" min="0" placeholder="500" value="500" required style="margin-top: 6px;">
+                  <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">One-time registration fee charged to new members upon joining.</small>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: auto; height: 42px;">💾 Save Admission Fee</button>
+              </form>
+            </div>
+
+            <!-- Add New Plan Form -->
+            <h4 style="margin-bottom: 12px; font-size: 15px; color: var(--text-primary); font-weight: 700;">➕ Add New Membership Plan / Rate</h4>
+            <form id="createPlanForm" style="margin-bottom: 28px;">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Plan Name *</label>
+                  <input type="text" class="form-input" id="newPlanName" required placeholder="e.g. Monthly, Quarterly, Student Saver">
+                </div>
+                <div class="form-group">
+                  <label>Duration (Months) *</label>
+                  <input type="number" class="form-input" id="newPlanDuration" required min="1" max="120" placeholder="e.g. 1, 3, 6, 12">
+                </div>
+                <div class="form-group">
+                  <label>Rate / Price (NPR) *</label>
+                  <input type="number" class="form-input" id="newPlanPrice" required min="0" placeholder="e.g. 2000, 5500">
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>Description / Features (Optional)</label>
+                <input type="text" class="form-input" id="newPlanDesc" placeholder="e.g. Full gym access + cardio & lockers">
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: auto;">➕ Add Plan Rate</button>
+            </form>
+            
+            <!-- Plans List Table -->
+            <div class="packages-list-container">
+              <h4 style="margin-bottom: 12px; font-size: 15px; color: var(--text-primary); font-weight: 700;">Active Membership Plans &amp; Rates</h4>
+              <div class="table-container" style="margin-top: 10px; box-shadow: none; border: 1px solid var(--glass-border); border-radius: var(--radius-sm); overflow: hidden;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Plan Name</th>
+                      <th>Duration</th>
+                      <th>Rate (NPR)</th>
+                      <th>Description</th>
+                      <th style="width: 100px; text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="plansListBody">
+                    <!-- Dynamic plans list loaded here -->
+                  </tbody>
+                </table>
+                <div id="emptyPlansState" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; display: none;">
+                  No membership plans found. Add one above!
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
         <div class="settings-card">
           <h3>🔑 Change Password</h3>
@@ -1021,12 +1046,9 @@
               <input type="date" class="form-input" id="memberExpiryDate" required placeholder="Select date">
             </div>
             <div class="form-group">
-              <label>Plan Type</label>
-              <select class="form-input" id="memberPlan">
-                <option value="Monthly">Monthly</option>
-                <option value="Quarterly">Quarterly (3 months)</option>
-                <option value="Half-Yearly">Half-Yearly (6 months)</option>
-                <option value="Yearly">Yearly (12 months)</option>
+              <label>Plan Type *</label>
+              <select class="form-input" id="memberPlan" required>
+                <!-- Loaded dynamically from /api/plans with exact custom rates -->
               </select>
             </div>
           </div>
@@ -1392,6 +1414,43 @@
         <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
         <button class="btn btn-danger" id="confirmOk">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- EDIT PLAN MODAL -->
+  <div class="modal-overlay" id="editPlanModal">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 id="editPlanModalTitle">✏️ Edit Membership Plan Rate</h2>
+        <button class="modal-close" id="editPlanModalClose">&times;</button>
+      </div>
+      <form id="editPlanForm">
+        <div class="modal-body">
+          <input type="hidden" id="editPlanId">
+          <div class="form-group">
+            <label>Plan Name *</label>
+            <input type="text" class="form-input" id="editPlanName" required placeholder="e.g. Monthly">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Duration (Months) *</label>
+              <input type="number" class="form-input" id="editPlanDuration" required min="1" max="120" placeholder="1">
+            </div>
+            <div class="form-group">
+              <label>Rate / Price (NPR) *</label>
+              <input type="number" class="form-input" id="editPlanPrice" required min="0" placeholder="2000">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Description / Features (Optional)</label>
+            <input type="text" class="form-input" id="editPlanDesc" placeholder="e.g. Standard 1-month fitness access">
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:16px 24px; border-top:1px solid var(--glass-border);">
+          <button type="button" class="btn btn-secondary" id="editPlanModalCancel" style="width:auto;">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="editPlanModalSubmit" style="width:auto;">💾 Save Changes</button>
+        </div>
+      </form>
     </div>
   </div>
 

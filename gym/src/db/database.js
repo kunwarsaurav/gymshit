@@ -826,7 +826,11 @@ function getLogisticsTransactions(limit = 50) {
 }
 
 function getAllPlans() {
-  return db.prepare('SELECT * FROM plans WHERE is_active = 1 ORDER BY plan_name ASC').all();
+  return db.prepare('SELECT * FROM plans WHERE is_active = 1 ORDER BY duration_value ASC, regular_price ASC').all();
+}
+
+function getPlanById(id) {
+  return db.prepare('SELECT * FROM plans WHERE id = ?').get(id);
 }
 
 function addPlan(plan) {
@@ -836,6 +840,23 @@ function addPlan(plan) {
   `);
   const result = stmt.run(plan.plan_name, plan.description || '', plan.duration_value, plan.duration_type || 'MONTH', plan.regular_price);
   return { id: result.lastInsertRowid, ...plan };
+}
+
+function updatePlan(id, plan) {
+  const stmt = db.prepare(`
+    UPDATE plans
+    SET plan_name = ?, description = ?, duration_value = ?, duration_type = ?, regular_price = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  stmt.run(
+    plan.plan_name.trim(),
+    plan.description || '',
+    parseInt(plan.duration_value),
+    plan.duration_type || 'MONTH',
+    parseFloat(plan.regular_price),
+    parseInt(id)
+  );
+  return getPlanById(id);
 }
 
 function deletePlan(id) {
@@ -1394,7 +1415,9 @@ module.exports = {
   recordLogisticsTransaction,
   getLogisticsTransactions,
   getAllPlans,
+  getPlanById,
   addPlan,
+  updatePlan,
   deletePlan,
   createMembership,
   renewMembership,

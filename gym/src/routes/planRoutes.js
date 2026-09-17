@@ -30,10 +30,52 @@ router.post('/', requireAuth, (req, res) => {
   }
 });
 
+router.put('/:id', requireAuth, (req, res) => {
+  const { plan_name, description, duration_value, duration_type, regular_price } = req.body;
+  if (!plan_name || !duration_value || isNaN(regular_price)) {
+    return res.status(400).json({ error: 'Plan name, duration, and price are required.' });
+  }
+  try {
+    const updated = db.updatePlan(parseInt(req.params.id), {
+      plan_name: plan_name.trim(),
+      description: description || '',
+      duration_value: parseInt(duration_value),
+      duration_type: duration_type || 'MONTH',
+      regular_price: parseFloat(regular_price)
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', requireAuth, (req, res) => {
   try {
     db.deletePlan(parseInt(req.params.id));
     res.json({ success: true, message: 'Plan deleted.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admission / Registration Fee settings
+router.get('/admission-fee', requireAuth, (req, res) => {
+  try {
+    const fee = parseFloat(db.getSetting('admission_fee', '500')) || 0;
+    res.json({ admission_fee: fee });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/admission-fee', requireAuth, (req, res) => {
+  try {
+    const fee = parseFloat(req.body.admission_fee);
+    if (isNaN(fee) || fee < 0) {
+      return res.status(400).json({ error: 'Valid admission fee amount is required.' });
+    }
+    db.setSetting('admission_fee', String(fee));
+    res.json({ success: true, admission_fee: fee, message: 'Admission fee updated successfully.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -404,13 +404,23 @@ document.getElementById('addMemberBtn').addEventListener('click', () => {
   form.reset();
   document.getElementById('memberId').value = '';
   document.getElementById('memberJoinDate').value = new Date().toISOString().split('T')[0];
-  document.getElementById('memberDuration').value = '1';
-  document.getElementById('memberPlan').value = 'Monthly';
+  
+  if (allGymPlans.length > 0) {
+    const firstPlan = allGymPlans[0];
+    document.getElementById('memberPlan').value = firstPlan.plan_name;
+    document.getElementById('memberDuration').value = firstPlan.duration_value.toString();
+    const initialTotal = firstPlan.regular_price + (gymAdmissionFee || 0);
+    document.getElementById('memberAmountPaid').value = initialTotal;
+    document.getElementById('memberAmountPaid').placeholder = `e.g. ${initialTotal} (${firstPlan.regular_price} plan + ${gymAdmissionFee} adm.)`;
+  } else {
+    document.getElementById('memberDuration').value = '1';
+    document.getElementById('memberAmountPaid').value = '0';
+  }
+
   document.getElementById('memberDOB').value = '';
   document.getElementById('memberGender').value = 'male';
   document.getElementById('memberEmergencyName').value = '';
   document.getElementById('memberEmergencyPhone').value = '';
-  document.getElementById('memberAmountPaid').value = '0';
   document.getElementById('memberPaymentMethod').value = 'Cash';
   document.getElementById('memberTransactionRef').value = '';
   document.getElementById('memberPaymentDueDate').value = '';
@@ -462,49 +472,32 @@ document.getElementById('memberDuration').addEventListener('change', () => {
   
   if (durationVal !== 'custom') {
     const duration = parseInt(durationVal, 10);
-    const matchedPkg = customPackages.find(p => p.duration_months === duration);
-    if (matchedPkg) {
-      planSelect.value = matchedPkg.name;
-    } else {
-      if (duration === 1) planSelect.value = 'Monthly';
-      else if (duration === 3) planSelect.value = 'Quarterly';
-      else if (duration === 6) planSelect.value = 'Half-Yearly';
-      else if (duration === 12) planSelect.value = 'Yearly';
+    const matchedPlan = allGymPlans.find(p => p.duration_value === duration);
+    if (matchedPlan) {
+      planSelect.value = matchedPlan.plan_name;
+      // Auto-update amount paid if new member
+      if (!document.getElementById('memberId').value) {
+        const total = matchedPlan.regular_price + (gymAdmissionFee || 0);
+        document.getElementById('memberAmountPaid').value = total;
+      }
     }
   }
   calculateExpiryDate();
 });
 
-// Synchronize Plan Type changes to Duration selection
+// Synchronize Plan Type changes to Duration & Pricing
 document.getElementById('memberPlan').addEventListener('change', () => {
   const planVal = document.getElementById('memberPlan').value;
   const durationSelect = document.getElementById('memberDuration');
+  const matchedPlan = allGymPlans.find(p => p.plan_name === planVal);
   
-  if (planVal === 'Monthly') {
-    durationSelect.value = '1';
-  } else if (planVal === 'Quarterly') {
-    durationSelect.value = '3';
-  } else if (planVal === 'Half-Yearly') {
-    durationSelect.value = '6';
-  } else if (planVal === 'Yearly') {
-    durationSelect.value = '12';
-  } else {
-    const pkg = customPackages.find(p => p.name === planVal);
-    if (pkg) {
-      let optionExists = false;
-      for (let i = 0; i < durationSelect.options.length; i++) {
-        if (durationSelect.options[i].value == pkg.duration_months) {
-          optionExists = true;
-          break;
-        }
-      }
-      if (!optionExists) {
-        const newOpt = document.createElement('option');
-        newOpt.value = pkg.duration_months;
-        newOpt.textContent = `${pkg.duration_months} Months`;
-        durationSelect.appendChild(newOpt);
-      }
-      durationSelect.value = pkg.duration_months.toString();
+  if (matchedPlan) {
+    durationSelect.value = matchedPlan.duration_value.toString();
+    // Auto-update amount paid if onboarding new member
+    if (!document.getElementById('memberId').value) {
+      const total = matchedPlan.regular_price + (gymAdmissionFee || 0);
+      document.getElementById('memberAmountPaid').value = total;
+      document.getElementById('memberAmountPaid').placeholder = `e.g. ${total} (${matchedPlan.regular_price} plan + ${gymAdmissionFee} adm.)`;
     }
   }
   calculateExpiryDate();
@@ -1922,88 +1915,118 @@ document.getElementById('photoTabWebcamBtn').addEventListener('click', () => {
 document.getElementById('webcamStartBtn').addEventListener('click', startWebcam);
 document.getElementById('webcamCaptureBtn').addEventListener('click', captureWebcamPhoto);
 
-// ─── OFFER PACKAGES MANAGEMENT ───
-let customPackages = [];
+// ─── DYNAMIC MEMBERSHIP PLANS & RATES MANAGEMENT ───
+let allGymPlans = [];
+let gymAdmissionFee = 500;
+let customPackages = []; // Backward compatibility
 
 async function loadPackages() {
   try {
-    const res = await fetch('/api/packages');
-    if (!res.ok) {
-      throw new Error(`Server returned status ${res.status}`);
-    }
-    const contentType = res.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Server returned HTML instead of JSON. Please restart the backend server.');
-    }
-    customPackages = await res.json();
+    const [plansRes, feeRes] = await Promise.all([
+      fetch('/api/plans'),
+      fetch('/api/plans/admission-fee')
+    ]);
     
-    // Render settings custom packages list table
-    const tbody = document.getElementById('packagesListBody');
-    const empty = document.getElementById('emptyPackagesState');
-    
-    if (!tbody || !empty) return;
-    
-    if (customPackages.length === 0) {
-      tbody.innerHTML = '';
-      empty.style.display = 'block';
-    } else {
-      empty.style.display = 'none';
-      tbody.innerHTML = customPackages.map(p => `
-        <tr>
-          <td><strong>${escapeHtml(p.name)}</strong></td>
-          <td>${p.duration_months} Month${p.duration_months > 1 ? 's' : ''}</td>
-          <td>Rs. ${p.price}</td>
-          <td style="text-align: center;">
-            <button class="action-btn delete" onclick="deletePackage(${p.id}, '${escapeHtml(p.name)}')" title="Delete Package">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-            </button>
-          </td>
-        </tr>
-      `).join('');
+    if (plansRes.ok) {
+      allGymPlans = await plansRes.json();
+      customPackages = allGymPlans.map(p => ({
+        id: p.id,
+        name: p.plan_name,
+        duration_months: p.duration_value,
+        price: p.regular_price
+      }));
     }
     
+    if (feeRes.ok) {
+      const feeData = await feeRes.json();
+      gymAdmissionFee = typeof feeData.admission_fee === 'number' ? feeData.admission_fee : 500;
+      const feeInput = document.getElementById('settingAdmissionFee');
+      if (feeInput) feeInput.value = gymAdmissionFee;
+    }
+    
+    renderPlansSettingsTable();
     updateMemberPlanDropdown();
   } catch (err) {
-    console.error('Failed to load packages:', err);
+    console.error('Failed to load plans & rates:', err);
   }
+}
+
+function renderPlansSettingsTable() {
+  const tbody = document.getElementById('plansListBody') || document.getElementById('packagesListBody');
+  const empty = document.getElementById('emptyPlansState') || document.getElementById('emptyPackagesState');
+  if (!tbody) return;
+
+  if (!allGymPlans || allGymPlans.length === 0) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+  tbody.innerHTML = allGymPlans.map(p => `
+    <tr>
+      <td>
+        <strong style="color: var(--text-primary); font-size: 14px;">${escapeHtml(p.plan_name)}</strong>
+      </td>
+      <td>
+        <span class="badge active" style="font-size: 11px;">
+          ${p.duration_value} ${p.duration_type === 'MONTH' ? (p.duration_value > 1 ? 'Months' : 'Month') : p.duration_type}
+        </span>
+      </td>
+      <td>
+        <strong style="color: var(--green); font-size: 14px;">NPR ${p.regular_price.toLocaleString()}</strong>
+      </td>
+      <td style="color: var(--text-muted); font-size: 12px;">
+        ${escapeHtml(p.description || 'Standard gym access')}
+      </td>
+      <td style="text-align: center;">
+        <div class="actions-cell" style="justify-content: center;">
+          <button class="action-btn" onclick="openEditPlanModal(${p.id})" title="Edit Plan Rate">✏️</button>
+          <button class="action-btn delete" onclick="deleteGymPlan(${p.id}, '${escapeHtml(p.plan_name)}')" title="Delete Plan">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function updateMemberPlanDropdown() {
   const select = document.getElementById('memberPlan');
   if (!select) return;
-  
-  // Retain standard options
-  let html = `
-    <option value="Monthly">Monthly</option>
-    <option value="Quarterly">Quarterly (3 months)</option>
-    <option value="Half-Yearly">Half-Yearly (6 months)</option>
-    <option value="Yearly">Yearly (12 months)</option>
-  `;
-  
-  // Append custom packages
-  customPackages.forEach(p => {
-    html += `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)} (${p.duration_months} Months - Rs. ${p.price})</option>`;
-  });
-  
-  select.innerHTML = html;
+
+  if (!allGymPlans || allGymPlans.length === 0) {
+    select.innerHTML = '<option value="">-- No Plans Configured --</option>';
+    return;
+  }
+
+  const prevVal = select.value;
+  select.innerHTML = allGymPlans.map(p => {
+    const durLabel = `${p.duration_value} ${p.duration_type === 'MONTH' ? (p.duration_value > 1 ? 'Months' : 'Month') : p.duration_type}`;
+    return `<option value="${escapeHtml(p.plan_name)}" data-id="${p.id}" data-price="${p.regular_price}" data-months="${p.duration_value}">${escapeHtml(p.plan_name)} — NPR ${p.regular_price.toLocaleString()} (${durLabel})</option>`;
+  }).join('');
+
+  if (prevVal && allGymPlans.some(p => p.plan_name === prevVal)) {
+    select.value = prevVal;
+  }
 }
 
-document.getElementById('createPackageForm')?.addEventListener('submit', async (e) => {
+// ─── Add New Plan ─────────────────────────────
+document.getElementById('createPlanForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const name = document.getElementById('pkgName').value.trim();
-  const duration_months = parseInt(document.getElementById('pkgDuration').value);
-  const price = parseFloat(document.getElementById('pkgPrice').value);
-  
+  const plan_name = document.getElementById('newPlanName').value.trim();
+  const duration_value = parseInt(document.getElementById('newPlanDuration').value);
+  const regular_price = parseFloat(document.getElementById('newPlanPrice').value);
+  const description = document.getElementById('newPlanDesc').value.trim();
+
   try {
-    const res = await fetch('/api/packages', {
+    const res = await fetch('/api/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, duration_months, price })
+      body: JSON.stringify({ plan_name, duration_value, duration_type: 'MONTH', regular_price, description })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create package');
-    
-    showToast('Package created successfully!', 'success');
+    if (!res.ok) throw new Error(data.error || 'Failed to add plan');
+
+    showToast(`Plan "${plan_name}" added successfully!`, 'success');
     e.target.reset();
     loadPackages();
   } catch (err) {
@@ -2011,21 +2034,127 @@ document.getElementById('createPackageForm')?.addEventListener('submit', async (
   }
 });
 
-function deletePackage(id, name) {
+// Backward compatibility form listener if old ID present
+document.getElementById('createPackageForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('pkgName').value.trim();
+  const duration_months = parseInt(document.getElementById('pkgDuration').value);
+  const price = parseFloat(document.getElementById('pkgPrice').value);
+
+  try {
+    const res = await fetch('/api/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan_name: name, duration_value: duration_months, duration_type: 'MONTH', regular_price: price, description: '' })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create plan');
+
+    showToast('Plan created successfully!', 'success');
+    e.target.reset();
+    loadPackages();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+// ─── Admission Fee Form ───────────────────────
+document.getElementById('admissionFeeForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const feeVal = parseFloat(document.getElementById('settingAdmissionFee').value);
+  if (isNaN(feeVal) || feeVal < 0) {
+    showToast('Please enter a valid admission fee amount.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/plans/admission-fee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ admission_fee: feeVal })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save admission fee');
+
+    gymAdmissionFee = feeVal;
+    showToast('Default admission fee saved successfully!', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+// ─── Edit Plan Modal Logic ───────────────────
+const editPlanModal = document.getElementById('editPlanModal');
+
+function openEditPlanModal(planId) {
+  const plan = allGymPlans.find(p => p.id === planId);
+  if (!plan) return;
+
+  document.getElementById('editPlanId').value = plan.id;
+  document.getElementById('editPlanName').value = plan.plan_name;
+  document.getElementById('editPlanDuration').value = plan.duration_value;
+  document.getElementById('editPlanPrice').value = plan.regular_price;
+  document.getElementById('editPlanDesc').value = plan.description || '';
+  
+  if (editPlanModal) editPlanModal.classList.add('active');
+}
+
+function closeEditPlanModal() {
+  if (editPlanModal) editPlanModal.classList.remove('active');
+}
+
+document.getElementById('editPlanModalClose')?.addEventListener('click', closeEditPlanModal);
+document.getElementById('editPlanModalCancel')?.addEventListener('click', closeEditPlanModal);
+editPlanModal?.addEventListener('click', (e) => {
+  if (e.target === editPlanModal) closeEditPlanModal();
+});
+
+document.getElementById('editPlanForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('editPlanId').value;
+  const plan_name = document.getElementById('editPlanName').value.trim();
+  const duration_value = parseInt(document.getElementById('editPlanDuration').value);
+  const regular_price = parseFloat(document.getElementById('editPlanPrice').value);
+  const description = document.getElementById('editPlanDesc').value.trim();
+
+  try {
+    const res = await fetch(`/api/plans/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan_name, duration_value, duration_type: 'MONTH', regular_price, description })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update plan');
+
+    showToast(`Plan "${plan_name}" rate updated successfully!`, 'success');
+    closeEditPlanModal();
+    loadPackages();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+// ─── Delete Plan Logic ───────────────────────
+function deleteGymPlan(id, name) {
   confirmAction(
     `Delete ${name}?`,
-    `Are you sure you want to remove this custom membership package?`,
+    `Are you sure you want to remove the "${name}" membership plan?`,
     async () => {
       try {
-        const res = await fetch(`/api/packages/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/plans/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Delete failed');
-        showToast('Package deleted successfully', 'success');
+        showToast(`Plan "${name}" deleted successfully`, 'success');
         loadPackages();
       } catch (err) {
-        showToast(err.message || 'Failed to delete package', 'error');
+        showToast(err.message || 'Failed to delete plan', 'error');
       }
     }
   );
+}
+
+// Backward compatible deletePackage alias
+function deletePackage(id, name) {
+  deleteGymPlan(id, name);
 }
 
 // ═══════════════════════════════════════════════
