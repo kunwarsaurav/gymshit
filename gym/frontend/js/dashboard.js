@@ -2492,8 +2492,8 @@ function setReportDateRange(rangeType) {
     startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
   } else if (rangeType === 'this_year') {
     startDate = new Date(today.getFullYear(), 0, 1);
-  } else if (rangeType === 'all_time') {
-    startDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  } else if (rangeType === '2_years' || rangeType === 'all_time') {
+    startDate = new Date(today.getFullYear() - 2, today.getMonth(), today.getDate());
   }
 
   startInput.value = formatD(startDate);
@@ -2764,6 +2764,21 @@ function generateProfessionalReportHTML(d) {
   `;
 }
 
+// Helper function to trigger browser download with correct filename
+function triggerFileDownload(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    if (document.body.contains(a)) document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  }, 2000);
+}
+
 // Generate & Email PDF via Outlook
 document.getElementById('generateEmailPdfBtn')?.addEventListener('click', async () => {
   const emailInput = document.getElementById('reportEmail');
@@ -2777,41 +2792,40 @@ document.getElementById('generateEmailPdfBtn')?.addEventListener('click', async 
     return;
   }
 
+  const previewEl = document.getElementById('reportPreviewContainer');
+  if (!previewEl) {
+    showToast('Report preview not ready', 'error');
+    return;
+  }
+
   const btn = document.getElementById('generateEmailPdfBtn');
   const originalText = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Generating PDF...';
+    btn.innerHTML = '<span>⏳</span> Compiling PDF...';
   }
 
   showToast('Compiling executive PDF report...', 'success');
   
-  const htmlReport = generateProfessionalReportHTML(currentReportData);
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = htmlReport;
-  tempDiv.style.padding = '20px';
-  tempDiv.style.position = 'absolute';
-  tempDiv.style.left = '-9999px';
-  tempDiv.style.top = '0';
-  document.body.appendChild(tempDiv);
-  
   const filename = `Gym_Report_${currentReportData.startDate}_to_${currentReportData.endDate}.pdf`;
   
   const opt = {
-    margin:       [0.4, 0.4, 0.4, 0.4],
+    margin:       [8, 8, 8, 8],
     filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   try {
-    const pdfBase64 = await html2pdf().set(opt).from(tempDiv).output('datauristring');
-    if (document.body.contains(tempDiv)) {
-      document.body.removeChild(tempDiv);
-    }
+    // Generate both datauristring and blob from the rendered visible element
+    const pdfBase64 = await html2pdf().set(opt).from(previewEl).outputPdf('datauristring');
+    const pdfBlob = await html2pdf().set(opt).from(previewEl).outputPdf('blob');
     
-    showToast('Launching Outlook with PDF attached...', 'success');
+    // Automatically trigger local file download so the user has the physical PDF
+    triggerFileDownload(pdfBlob, filename);
+
+    showToast('Opening Outlook email client...', 'success');
     
     const res = await fetch('/api/reports/send-email', {
       method: 'POST',
@@ -2825,16 +2839,17 @@ document.getElementById('generateEmailPdfBtn')?.addEventListener('click', async 
     
     const data = await res.json();
     if (res.ok) {
-      showToast('Outlook draft created with PDF attached!', 'success');
+      if (data.method === 'com') {
+        showToast('Outlook opened with PDF attached!', 'success');
+      } else {
+        showToast('PDF downloaded & Email composer opened in Outlook!', 'success');
+      }
     } else {
       showToast(data.error || 'Failed to open Outlook email client', 'error');
     }
   } catch (err) {
     console.error('PDF generation error:', err);
     showToast('Error compiling PDF document.', 'error');
-    if (document.body.contains(tempDiv)) {
-      document.body.removeChild(tempDiv);
-    }
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -2850,6 +2865,12 @@ document.getElementById('downloadPdfBtn')?.addEventListener('click', async () =>
     return;
   }
 
+  const previewEl = document.getElementById('reportPreviewContainer');
+  if (!previewEl) {
+    showToast('Report preview not ready', 'error');
+    return;
+  }
+
   const btn = document.getElementById('downloadPdfBtn');
   const originalText = btn ? btn.innerHTML : '';
   if (btn) {
@@ -2857,37 +2878,26 @@ document.getElementById('downloadPdfBtn')?.addEventListener('click', async () =>
     btn.innerHTML = '<span>⏳</span> Preparing PDF...';
   }
 
-  showToast('Generating PDF for download...', 'success');
-
-  const htmlReport = generateProfessionalReportHTML(currentReportData);
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = htmlReport;
-  tempDiv.style.padding = '20px';
-  tempDiv.style.position = 'absolute';
-  tempDiv.style.left = '-9999px';
-  tempDiv.style.top = '0';
-  document.body.appendChild(tempDiv);
+  showToast('Generating high-resolution PDF...', 'success');
 
   const filename = `Gym_Report_${currentReportData.startDate}_to_${currentReportData.endDate}.pdf`;
 
   const opt = {
-    margin:       [0.4, 0.4, 0.4, 0.4],
+    margin:       [8, 8, 8, 8],
     filename:     filename,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   try {
-    await html2pdf().set(opt).from(tempDiv).save();
+    const pdfBlob = await html2pdf().set(opt).from(previewEl).outputPdf('blob');
+    triggerFileDownload(pdfBlob, filename);
     showToast('PDF downloaded successfully!', 'success');
   } catch (err) {
     console.error('PDF download error:', err);
     showToast('Failed to download PDF.', 'error');
   } finally {
-    if (document.body.contains(tempDiv)) {
-      document.body.removeChild(tempDiv);
-    }
     if (btn) {
       btn.disabled = false;
       btn.innerHTML = originalText;
