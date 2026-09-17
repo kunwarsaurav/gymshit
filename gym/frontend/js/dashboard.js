@@ -2226,14 +2226,22 @@ async function loadProfileMemberships(memberId) {
       if (ms.discount_type === 'FIXED') discText = `Rs. ${ms.discount_amount}`;
       else if (ms.discount_type === 'PERCENT') discText = `${ms.discount_amount}%`;
       
+      const extraAdmission = (ms.final_payable_amount > ms.original_price) ? (ms.final_payable_amount - ms.original_price) : 0;
+
       return `
         <tr>
-          <td><strong>${escapeHtml(ms.plan_name_snapshot)}</strong></td>
+          <td>
+            <strong>${escapeHtml(ms.plan_name_snapshot)}</strong>
+            ${ms.notes ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">📝 ${escapeHtml(ms.notes)}</div>` : ''}
+          </td>
           <td>${formatDate(ms.start_date)}</td>
           <td>${formatDate(ms.end_date)}</td>
           <td>Rs. ${ms.original_price}</td>
           <td>${discText}</td>
-          <td>Rs. ${ms.final_payable_amount}</td>
+          <td>
+            <strong>Rs. ${ms.final_payable_amount}</strong>
+            ${extraAdmission > 0 ? `<div style="font-size:11px; color:var(--accent); font-weight:600;">(incl. Rs. ${extraAdmission} Adm. Fee)</div>` : ''}
+          </td>
           <td>Rs. ${ms.total_paid}</td>
           <td><span class="badge ${ms.membership_status.toLowerCase()}">${ms.membership_status}</span></td>
         </tr>
